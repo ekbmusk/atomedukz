@@ -1,0 +1,368 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 7%;
+    --foreground: 45 20% 92%;
+
+    --card: 220 18% 11%;
+    --card-foreground: 45 20% 92%;
+
+    --popover: 220 18% 11%;
+    --popover-foreground: 45 20% 92%;
+
+    --primary: 42 88% 56%;
+    --primary-foreground: 220 20% 7%;
+
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 45 15% 80%;
+
+    --muted: 220 12% 14%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 175 60% 42%;
+    --accent-foreground: 220 20% 7%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 45 20% 95%;
+
+    --border: 220 12% 18%;
+    --input: 220 12% 18%;
+    --ring: 42 88% 56%;
+
+    --radius: 0.75rem;
+
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Outfit', sans-serif;
+
+    --gradient-hero: linear-gradient(135deg, hsl(220 20% 7%) 0%, hsl(220 18% 11%) 50%, hsl(220 20% 8%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(38 90% 60%), hsl(340 70% 65%), hsl(270 60% 60%));
+    --gradient-card: linear-gradient(180deg, hsl(220 18% 12%) 0%, hsl(220 18% 9%) 100%);
+    --shadow-glow: 0 0 40px -10px hsl(42 88% 56% / 0.3);
+    --shadow-card: 0 8px 32px -8px hsl(220 20% 2% / 0.6);
+
+    --sidebar-background: 220 18% 9%;
+    --sidebar-foreground: 45 15% 80%;
+    --sidebar-primary: 42 88% 56%;
+    --sidebar-primary-foreground: 220 20% 7%;
+    --sidebar-accent: 220 15% 15%;
+    --sidebar-accent-foreground: 45 15% 80%;
+    --sidebar-border: 220 12% 18%;
+    --sidebar-ring: 42 88% 56%;
+  }
+}
+
+@layer base {
+  /* Light mode — cool slate with amber accents */
+  .light {
+    --background: 220 16% 93%;
+    --foreground: 220 25% 10%;
+
+    --card: 220 14% 97%;
+    --card-foreground: 220 25% 10%;
+
+    --popover: 220 14% 97%;
+    --popover-foreground: 220 25% 10%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 220 20% 7%;
+
+    --secondary: 220 12% 88%;
+    --secondary-foreground: 220 20% 18%;
+
+    --muted: 220 10% 90%;
+    --muted-foreground: 220 10% 40%;
+
+    --accent: 175 55% 34%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 12% 82%;
+    --input: 220 12% 84%;
+    --ring: 38 92% 50%;
+
+    --gradient-hero: linear-gradient(135deg, hsl(220 16% 93%) 0%, hsl(220 14% 89%) 50%, hsl(220 16% 93%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(38 90% 50%), hsl(340 65% 55%), hsl(270 55% 50%));
+    --gradient-card: linear-gradient(180deg, hsl(220 14% 97%) 0%, hsl(220 12% 93%) 100%);
+    --shadow-glow: 0 0 40px -10px hsl(38 92% 50% / 0.25);
+    --shadow-card: 0 4px 24px -4px hsl(220 20% 20% / 0.08);
+
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 220 20% 15%;
+    --sidebar-primary: 38 92% 50%;
+    --sidebar-primary-foreground: 220 20% 7%;
+    --sidebar-accent: 220 12% 88%;
+    --sidebar-accent-foreground: 220 20% 18%;
+    --sidebar-border: 220 12% 82%;
+    --sidebar-ring: 38 92% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-weight: 400;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  h1,
+  h2 {
+    font-weight: 700;
+  }
+
+  button {
+    font-family: var(--font-body);
+    font-weight: 500;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ─── AtomEdu — scientific minimalism utilities ───────────────────── */
+
+  /* Mono uppercase label, like a section marker in scientific paper */
+  .label-mono {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Tabular numerals for scientific data */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Subtle dot grid background */
+  .bg-grid-dots {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .bg-grid-dots-fine {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.05) 0.5px, transparent 0.5px);
+    background-size: 14px 14px;
+  }
+
+  /* Hairline divider — used between sections like a horizontal rule */
+  .hairline {
+    border-color: hsl(var(--foreground) / 0.12);
+  }
+
+  /* Corner crosshair — small + marks at the four corners of a card.
+     Add to any element to give it a "callout / drawing" feel.       */
+  .corners {
+    position: relative;
+  }
+  .corners::before,
+  .corners::after,
+  .corners > .corner-tl,
+  .corners > .corner-tr,
+  .corners > .corner-bl,
+  .corners > .corner-br {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-color: hsl(var(--primary));
+    pointer-events: none;
+  }
+  .corners::before {
+    top: -4px;
+    left: -4px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .corners::after {
+    top: -4px;
+    right: -4px;
+    border-top: 1px solid;
+    border-right: 1px solid;
+  }
+  .corners > .corner-bl {
+    bottom: -4px;
+    left: -4px;
+    border-bottom: 1px solid;
+    border-left: 1px solid;
+  }
+  .corners > .corner-br {
+    bottom: -4px;
+    right: -4px;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
+  }
+
+  /* Spectral lines decoration — vertical thin lines at varying heights,
+     evokes an emission spectrum diagram */
+  .spectrum {
+    background-image: repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent 11px,
+      hsl(var(--primary) / 0.4) 11px,
+      hsl(var(--primary) / 0.4) 12px,
+      transparent 12px,
+      transparent 27px,
+      hsl(var(--primary) / 0.25) 27px,
+      hsl(var(--primary) / 0.25) 28px,
+      transparent 28px,
+      transparent 53px,
+      hsl(var(--accent) / 0.5) 53px,
+      hsl(var(--accent) / 0.5) 54px,
+      transparent 54px,
+      transparent 91px
+    );
+  }
+
+  /* Crosshair cursor for interactive science elements */
+  .cursor-crosshair-precise {
+    cursor: crosshair;
+  }
+
+  /* Animated underline that draws on hover (left → right) */
+  .draw-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.4s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .draw-underline:hover {
+    background-size: 100% 1px;
+  }
+
+
+  .bg-hero {
+    background: var(--gradient-hero);
+  }
+
+  .bg-card-gradient {
+    background: var(--gradient-card);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ─── Light mode visual overrides ─── */
+
+  /* Glassmorphism surface replacements */
+  .light .bg-white\/\[0\.03\],
+  .light .bg-white\/\[0\.04\] {
+    background-color: hsl(220 14% 96% / 0.7);
+  }
+
+  .light .bg-white\/\[0\.06\],
+  .light .bg-white\/\[0\.08\] {
+    background-color: hsl(220 12% 94% / 0.8);
+  }
+
+  .light .border-white\/\[0\.06\],
+  .light .border-white\/\[0\.08\],
+  .light .border-white\/\[0\.10\],
+  .light .border-white\/10 {
+    border-color: hsl(220 12% 80%);
+  }
+
+  /* Card gradient — cool slate */
+  .light .bg-card-gradient {
+    background: linear-gradient(180deg, hsl(220 14% 97%) 0%, hsl(220 12% 93%) 100%);
+  }
+
+  /* Hero — cool slate */
+  .light .bg-hero {
+    background: linear-gradient(135deg, hsl(220 16% 93%) 0%, hsl(220 14% 89%) 50%, hsl(220 16% 93%) 100%);
+  }
+
+  /* Text gradient — gold → pink → purple */
+  .light .text-gradient {
+    background: linear-gradient(135deg, hsl(38 90% 45%), hsl(340 60% 48%), hsl(270 50% 44%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glows — slightly stronger for cool bg */
+  .light .shadow-glow {
+    box-shadow: 0 0 35px -10px hsl(38 92% 50% / 0.25);
+  }
+
+  .light .shadow-card {
+    box-shadow: 0 2px 20px -4px hsl(220 20% 20% / 0.08);
+  }
+
+  /* ─── Dark contrast panels for light mode ─── */
+  .light-dark-panel {
+    background: hsl(220 25% 14%);
+    color: hsl(210 20% 92%);
+  }
+
+  .light-dark-panel .text-muted-foreground {
+    color: hsl(215 15% 60%);
+  }
+
+  .light-dark-panel .border-border {
+    border-color: hsl(220 25% 22%);
+  }
+
+  /* Alternating section bands */
+  .light .section-alt {
+    background: linear-gradient(180deg, hsl(220 12% 90%) 0%, hsl(220 14% 93%) 100%);
+  }
+
+  /* Radar chart grid lines */
+  .light .recharts-polar-grid line,
+  .light .recharts-polar-grid circle {
+    stroke: hsl(220 12% 82%) !important;
+  }
+}
+
+/* Floating card animations — lightweight CSS transforms */
+@keyframes float1 {
+  0%, 100% { transform: translateY(0) translateX(1rem); }
+  50% { transform: translateY(-12px) translateX(1rem); }
+}
+
+@keyframes float2 {
+  0%, 100% { transform: translateY(0) translateX(-0.5rem); }
+  50% { transform: translateY(-8px) translateX(-0.5rem); }
+}
+
+@keyframes float3 {
+  0%, 100% { transform: translateY(0) translateX(1.5rem); }
+  50% { transform: translateY(-15px) translateX(1.5rem); }
+}

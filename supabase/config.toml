@@ -1,0 +1,48 @@
+project_id = "rhkfocbexlfvijomzppx"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:8080"
+additional_redirect_urls = ["http://localhost:8080/auth", "http://localhost:5173/auth"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+[auth.external.google]
+enabled = false
+# Раскомментируйте и добавьте ваши credentials после создания OAuth приложения в Google Cloud Console
+# client_id = "your-client-id.apps.googleusercontent.com"
+# secret = "your-client-secret"
+
+[analytics]
+enabled = false
+
+# AI tutor — generates step-by-step hints for problems via Gemini.
+#
+# `verify_jwt = false` because Supabase's gateway-level verification
+# rejects CORS preflight (OPTIONS) and any browser request that doesn't
+# carry the JWT in the way Kong expects, returning 401 before our handler
+# runs. The function still verifies the user's JWT itself by calling
+# `userClient.auth.getUser()` early and returning 401 on failure, so this
+# isn't a security regression.
+[functions.ai-hint]
+verify_jwt = false

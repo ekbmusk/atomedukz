@@ -1,0 +1,48 @@
+# Dependencies
+node_modules
+
+# Build
+dist
+dist-ssr
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Supabase
+supabase/.temp
+
+# Lock files (optional, keep one)
+bun.lock
+.vercel
+
+# Content source (raw lecture materials, imported via scripts/importContent.ts)
+Атом Электронный кітап/
+content_source/
+
+# Generated slide PNGs — uploaded to Supabase Storage, not tracked in git
+slides_out/
