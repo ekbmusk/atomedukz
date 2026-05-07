@@ -99,8 +99,8 @@ const PHET_PER_TOPIC: Record<number, Array<{ sim_id: string; title_kz: string; t
     { sim_id: "blackbody-spectrum", title_kz: "Қара дене спектрі", title_ru: "Спектр чёрного тела" },
   ],
   2: [
-    { sim_id: "fourier-making-waves", title_kz: "Фурье: толқындар жасау", title_ru: "Фурье: создание волн" },
-    { sim_id: "waves-intro", title_kz: "Толқындарға кіріспе", title_ru: "Введение в волны" },
+    { sim_id: "rutherford-scattering", title_kz: "Резерфорд шашырауы", title_ru: "Рассеяние Резерфорда" },
+    { sim_id: "models-of-the-hydrogen-atom", title_kz: "Сутегі атомының модельдері", title_ru: "Модели атома водорода" },
   ],
   3: [
     { sim_id: "models-of-the-hydrogen-atom", title_kz: "Сутегі атомының модельдері", title_ru: "Модели атома водорода" },
