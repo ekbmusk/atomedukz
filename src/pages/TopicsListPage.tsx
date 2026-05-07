@@ -164,10 +164,9 @@ const TopicCard = ({
         {labGraded && (
           <div
             className="absolute top-9 left-4 inline-flex items-center gap-1 label-mono text-[9px] text-primary"
-            title="Зертхана бағаланды"
+            title="Зертханалық жұмыс бағаланды"
           >
             <Check size={9} strokeWidth={2} />
-            <span>лаб</span>
           </div>
         )}
 

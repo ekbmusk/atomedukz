@@ -170,6 +170,7 @@ function parseLabMarkdown(md: string): ParsedDoc {
 
 const LabContent = ({ markdown }: { markdown: string }) => {
   const doc = useMemo(() => parseLabMarkdown(markdown), [markdown]);
+  const phetCtx = useContext(TopicPhetContext);
 
   // Fallback for unrecognised structure — at least show the markdown.
   if (!doc.title && doc.sections.length === 0) {
@@ -178,7 +179,12 @@ const LabContent = ({ markdown }: { markdown: string }) => {
 
   return (
     <div className="space-y-8">
-      <Hero title={doc.title} subtitle={doc.subtitle} intro={doc.intro} />
+      <Hero
+        title={doc.title}
+        subtitle={doc.subtitle}
+        intro={doc.intro}
+        simId={phetCtx.defaultSimId}
+      />
 
       <div className="space-y-5">
         {(() => {
@@ -203,10 +209,15 @@ const Hero = ({
   title,
   subtitle,
   intro,
+  simId,
 }: {
   title: string | null;
   subtitle: string | null;
   intro: string;
+  /** PhET sim id for this topic (if any). Renders an always-visible
+   *  launcher right under the lab title so the simulator is one click
+   *  away from the very top of the lab. */
+  simId: string | null;
 }) => (
   <div className="relative overflow-hidden border border-border bg-gradient-to-br from-card/60 via-background to-background p-7 md:p-10">
     <div className="absolute -top-12 -right-12 text-primary/10 pointer-events-none">
@@ -231,6 +242,14 @@ const Hero = ({
       {intro && (
         <div className="mt-5 max-w-3xl">
           <Markdown className="text-sm text-foreground/80 leading-relaxed">{intro}</Markdown>
+        </div>
+      )}
+      {simId && (
+        <div className="mt-6 pt-5 border-t border-border/60">
+          <span className="label-mono text-[10px] text-muted-foreground block mb-2">
+            СИМУЛЯТОР
+          </span>
+          <PhetInlineEmbed simId={simId} title={simId.replace(/-/g, " ")} />
         </div>
       )}
     </div>

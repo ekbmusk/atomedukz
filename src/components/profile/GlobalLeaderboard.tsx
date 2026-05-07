@@ -107,7 +107,7 @@ const GlobalLeaderboard = ({ rows }: Props) => {
                   >
                     {r.labs_avg_score ?? "—"}
                   </div>
-                  <div className="label-mono text-[9px] text-muted-foreground">лаб</div>
+                  <div className="label-mono text-[9px] text-muted-foreground">зерт.</div>
                 </div>
               </div>
             </motion.li>
