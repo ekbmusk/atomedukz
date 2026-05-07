@@ -5,6 +5,7 @@ import { Camera, Loader2, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import Avatar from "@/components/Avatar";
 import AvatarPresetPicker from "@/components/AvatarPresetPicker";
+import AvatarCropper from "@/components/AvatarCropper";
 import { useAuth } from "@/hooks/useAuth";
 import { useLang } from "@/i18n/LanguageContext";
 import { useUpdateProfile, uploadAvatar } from "@/hooks/useUpdateProfile";
@@ -29,6 +30,9 @@ const WelcomePage = () => {
   const [name, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  // File the user just picked from the upload input — opens the
+  // cropper modal until they confirm or cancel.
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   // If the user is already onboarded, skip ahead.
@@ -42,16 +46,33 @@ const WelcomePage = () => {
   }, [user?.id, profile?.full_name, profile?.avatar_url]);
 
   const onPickAvatar = () => fileRef.current?.click();
-  const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !user) return;
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error(t.profile.avatarTooLarge);
+      return;
+    }
+    // Hand off to the cropper. uploadAvatar happens only after the
+    // user picks a position and hits Save inside the modal.
+    setCropFile(file);
+  };
+
+  const onCropSave = async (blob: Blob) => {
+    if (!user) return;
     setAvatarBusy(true);
     try {
+      const file = new File([blob], "avatar.jpg", { type: "image/jpeg" });
       const url = await uploadAvatar(user.id, file);
       setAvatarUrl(url);
+      setCropFile(null);
     } catch (err) {
-      toast.error((err as Error).message === "AVATAR_TOO_LARGE" ? t.profile.avatarTooLarge : t.profile.saveError);
+      toast.error(
+        (err as Error).message === "AVATAR_TOO_LARGE"
+          ? t.profile.avatarTooLarge
+          : t.profile.saveError,
+      );
     } finally {
       setAvatarBusy(false);
     }
@@ -77,6 +98,13 @@ const WelcomePage = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-6 py-16">
+      {cropFile && (
+        <AvatarCropper
+          source={cropFile}
+          onSave={onCropSave}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

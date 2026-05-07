@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Avatar from "@/components/Avatar";
 import AvatarPresetPicker from "@/components/AvatarPresetPicker";
+import AvatarCropper from "@/components/AvatarCropper";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useLang } from "@/i18n/LanguageContext";
@@ -29,20 +30,12 @@ const ProfilePage = () => {
   const [editingIdentity, setEditingIdentity] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [avatarBusy, setAvatarBusy] = useState(false);
-  // Avatar staging — when the user picks a file we don't upload it yet,
-  // we hold the File + an object URL for preview, then either commit it
-  // (Қабылдау) or discard it (Болдырмау).
-  const [pendingAvatar, setPendingAvatar] = useState<{ file: File; previewUrl: string } | null>(null);
+  // File the user just picked — opens the AvatarCropper modal until
+  // they save or cancel. The cropper handles preview + drag/zoom and
+  // hands us a ready-to-upload Blob on save.
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const { data: progress, isLoading: progressLoading } = useStudentProgress(user?.id);
   const { data: leaderboard } = useGlobalLeaderboard(Boolean(user));
-
-  // Revoke the staged object URL when the component unmounts or when
-  // the staged file changes — otherwise the blob leaks.
-  useEffect(() => {
-    return () => {
-      if (pendingAvatar) URL.revokeObjectURL(pendingAvatar.previewUrl);
-    };
-  }, [pendingAvatar]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -54,31 +47,28 @@ const ProfilePage = () => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    // Quick client-side size guard mirroring uploadAvatar's check, so we
-    // don't even build a preview the user can't commit.
     if (file.size > 4 * 1024 * 1024) {
       toast.error(t.profile.avatarTooLarge);
       return;
     }
-    if (pendingAvatar) URL.revokeObjectURL(pendingAvatar.previewUrl);
-    setPendingAvatar({ file, previewUrl: URL.createObjectURL(file) });
+    setCropFile(file);
   };
-  const cancelPendingAvatar = () => {
-    if (pendingAvatar) URL.revokeObjectURL(pendingAvatar.previewUrl);
-    setPendingAvatar(null);
-  };
-  const acceptPendingAvatar = async () => {
-    if (!pendingAvatar || !user) return;
+  const onCropSave = async (blob: Blob) => {
+    if (!user) return;
     setAvatarBusy(true);
     try {
-      const url = await uploadAvatar(user.id, pendingAvatar.file);
+      const file = new File([blob], "avatar.jpg", { type: "image/jpeg" });
+      const url = await uploadAvatar(user.id, file);
       await updateProfile.mutateAsync({ userId: user.id, patch: { avatar_url: url } });
       await refreshProfile();
-      URL.revokeObjectURL(pendingAvatar.previewUrl);
-      setPendingAvatar(null);
+      setCropFile(null);
       toast.success(t.profile.saved);
     } catch (err) {
-      toast.error((err as Error).message === "AVATAR_TOO_LARGE" ? t.profile.avatarTooLarge : t.profile.saveError);
+      toast.error(
+        (err as Error).message === "AVATAR_TOO_LARGE"
+          ? t.profile.avatarTooLarge
+          : t.profile.saveError,
+      );
     } finally {
       setAvatarBusy(false);
     }
@@ -149,38 +139,43 @@ const ProfilePage = () => {
             </div>
             <div className="md:col-span-9">
               {/* Identity row */}
+              {cropFile && (
+                <AvatarCropper
+                  source={cropFile}
+                  onSave={onCropSave}
+                  onCancel={() => setCropFile(null)}
+                />
+              )}
               <div className="flex items-center gap-4 md:gap-5 mb-4">
                 <div className="relative shrink-0">
                   <button
                     type="button"
                     onClick={onPickAvatar}
-                    disabled={avatarBusy || Boolean(pendingAvatar)}
+                    disabled={avatarBusy}
                     className="relative group block"
                     title={t.profile.changeAvatar}
                   >
                     <span className="hidden md:block">
                       <Avatar
-                        url={pendingAvatar?.previewUrl ?? profile?.avatar_url}
+                        url={profile?.avatar_url}
                         name={profile?.full_name || user?.email}
                         size={80}
                       />
                     </span>
                     <span className="block md:hidden">
                       <Avatar
-                        url={pendingAvatar?.previewUrl ?? profile?.avatar_url}
+                        url={profile?.avatar_url}
                         name={profile?.full_name || user?.email}
                         size={56}
                       />
                     </span>
-                    {!pendingAvatar && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-background/70 opacity-0 group-active:opacity-100 group-hover:opacity-100 transition-opacity rounded-full">
-                        {avatarBusy ? (
-                          <Loader2 size={16} strokeWidth={1.4} className="animate-spin text-foreground" />
-                        ) : (
-                          <Camera size={14} strokeWidth={1.4} className="text-foreground" />
-                        )}
-                      </span>
-                    )}
+                    <span className="absolute inset-0 flex items-center justify-center bg-background/70 opacity-0 group-active:opacity-100 group-hover:opacity-100 transition-opacity rounded-full">
+                      {avatarBusy ? (
+                        <Loader2 size={16} strokeWidth={1.4} className="animate-spin text-foreground" />
+                      ) : (
+                        <Camera size={14} strokeWidth={1.4} className="text-foreground" />
+                      )}
+                    </span>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -189,34 +184,6 @@ const ProfilePage = () => {
                       className="hidden"
                     />
                   </button>
-                  {pendingAvatar && (
-                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-background border border-border shadow-md p-1">
-                      <button
-                        type="button"
-                        onClick={acceptPendingAvatar}
-                        disabled={avatarBusy}
-                        className="bg-primary text-primary-foreground px-2 py-1 label-mono text-[9px] inline-flex items-center gap-1 disabled:opacity-50"
-                        title={t.profile.avatarPreviewAccept}
-                      >
-                        {avatarBusy ? (
-                          <Loader2 size={10} strokeWidth={1.6} className="animate-spin" />
-                        ) : (
-                          <Check size={10} strokeWidth={2} />
-                        )}
-                        {t.profile.avatarPreviewAccept}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelPendingAvatar}
-                        disabled={avatarBusy}
-                        className="border border-border px-2 py-1 label-mono text-[9px] inline-flex items-center gap-1 hover:border-foreground transition-colors disabled:opacity-50"
-                        title={t.profile.avatarPreviewCancel}
-                      >
-                        <X size={10} strokeWidth={2} />
-                        {t.profile.avatarPreviewCancel}
-                      </button>
-                    </div>
-                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   {editingIdentity ? (
