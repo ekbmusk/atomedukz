@@ -23,13 +23,24 @@ const ProtectedRoute = ({ children, requiredRole, skipOnboardingCheck }: Protect
 
   if (!user) return <Navigate to="/auth" replace />;
 
+  // Hold the route until the profile fetch lands. Without this, a fresh
+  // signup would briefly see /topics (because profile === null skipped
+  // the onboarding gate below) before useAuth caught up — and on a slow
+  // network it could miss the redirect entirely.
+  if (!skipOnboardingCheck && role !== "teacher" && profile === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   // Onboarding gate — fresh accounts are sent to /welcome until they fill
   // in at least the basic identity fields. Teachers skip this; their seed
   // user already has a name, and we don't ask them for a group.
   if (
     !skipOnboardingCheck &&
     role !== "teacher" &&
-    profile !== null &&
     !profile?.full_name &&
     location.pathname !== "/welcome"
   ) {

@@ -41,12 +41,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserData = async (userId: string, force = false) => {
     if (!force && fetchedUserIdRef.current === userId) return;
     fetchedUserIdRef.current = userId;
-    const [{ data: roles }, { data: prof }] = await Promise.all([
+    const [{ data: roles }, profRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId),
-      supabase.from("profiles").select("full_name, avatar_url").eq("user_id", userId).single(),
+      supabase.from("profiles").select("full_name, avatar_url").eq("user_id", userId).maybeSingle(),
     ]);
-    if (roles && roles.length > 0) setRole(roles[0].role as AppRole);
-    if (prof) setProfile(prof);
+    if (roles && roles.length > 0) {
+      setRole(roles[0].role as AppRole);
+    } else {
+      // No role row — student is the safe default; matches the trigger.
+      setRole("student");
+    }
+
+    if (profRes.data) {
+      setProfile(profRes.data);
+      return;
+    }
+    // No profile row. Two reasons we land here:
+    //   1) handle_new_user trigger hasn't run yet (signup race), or
+    //   2) someone deleted the row manually leaving auth.users behind.
+    // Either way, create a blank profile so the rest of the app has a
+    // record to read/write. RLS allows the user to insert their own row.
+    const insertRes = await supabase
+      .from("profiles")
+      .insert({ user_id: userId, full_name: "", avatar_url: "" } as never)
+      .select("full_name, avatar_url")
+      .maybeSingle();
+    if (insertRes.data) {
+      setProfile(insertRes.data);
+    } else {
+      // Fall back to an empty in-memory profile so the onboarding gate
+      // still fires and the UI doesn't sit on a spinner forever.
+      setProfile({ full_name: "", avatar_url: "" });
+    }
   };
 
   useEffect(() => {
