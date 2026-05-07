@@ -14,6 +14,45 @@ import { ArrowLeft, ArrowRight, Loader2, KeyRound } from "lucide-react";
 const CODE_MIN = 6;
 const CODE_MAX = 10;
 
+// Persist the pending signup across reloads so the user doesn't lose
+// progress (and their typed password) if they refresh the verify page.
+// sessionStorage scope = current tab only — wiped on tab close.
+const PENDING_KEY = "atomedu.pending_signup";
+
+interface PendingSignup {
+  email: string;
+  name: string;
+  password: string;
+}
+
+const readPending = (): PendingSignup | null => {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingSignup;
+    if (!parsed?.email || !parsed?.password) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writePending = (p: PendingSignup) => {
+  try {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify(p));
+  } catch {
+    /* quota — ignore */
+  }
+};
+
+const clearPending = () => {
+  try {
+    sessionStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
 type Mode = "login" | "signup" | "verify";
 
 const AuthPage = () => {
@@ -21,10 +60,15 @@ const AuthPage = () => {
   const { user } = useAuth();
   const { t } = useLang();
 
-  const [mode, setMode] = useState<Mode>("login");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // Restore the verify step on page reload — without this, refreshing
+  // /auth in the middle of email verification kicked the user back to
+  // a blank login form and they had to start over (and re-receive the
+  // OTP) from scratch.
+  const initialPending = typeof window !== "undefined" ? readPending() : null;
+  const [mode, setMode] = useState<Mode>(initialPending ? "verify" : "login");
+  const [name, setName] = useState(initialPending?.name ?? "");
+  const [email, setEmail] = useState(initialPending?.email ?? "");
+  const [password, setPassword] = useState(initialPending?.password ?? "");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,7 +78,10 @@ const AuthPage = () => {
     const isRecovery =
       window.location.hash.includes("type=recovery") ||
       window.location.search.includes("type=recovery");
-    if (user && !isRecovery) navigate("/topics", { replace: true });
+    if (user && !isRecovery) {
+      clearPending();
+      navigate("/topics", { replace: true });
+    }
   }, [user, navigate]);
 
   const login = async (e: React.FormEvent) => {
@@ -80,6 +127,7 @@ const AuthPage = () => {
         toast.error(error.message);
         return;
       }
+      writePending({ email: email.trim(), name: name.trim(), password });
       toast.success(t.auth.codeSent);
       setMode("verify");
     } finally {
@@ -120,6 +168,7 @@ const AuthPage = () => {
       } else {
         toast.success(t.auth.signedUp);
       }
+      clearPending();
       navigate("/topics", { replace: true });
     } finally {
       setLoading(false);
@@ -357,6 +406,7 @@ const AuthPage = () => {
               <button
                 type="button"
                 onClick={() => {
+                  clearPending();
                   setMode("signup");
                   setCode("");
                 }}
