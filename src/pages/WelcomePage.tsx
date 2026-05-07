@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Camera, Loader2, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import Avatar from "@/components/Avatar";
+import AvatarPresetPicker from "@/components/AvatarPresetPicker";
 import { useAuth } from "@/hooks/useAuth";
 import { useLang } from "@/i18n/LanguageContext";
 import { useUpdateProfile, uploadAvatar } from "@/hooks/useUpdateProfile";
@@ -103,7 +104,7 @@ const WelcomePage = () => {
           </div>
 
           {/* Avatar picker */}
-          <div className="flex items-center gap-5 mb-6">
+          <div className="flex items-center gap-5 mb-4">
             <button
               type="button"
               onClick={onPickAvatar}
@@ -132,6 +133,19 @@ const WelcomePage = () => {
               </span>
               <p className="text-sm text-foreground/80 font-light">{t.welcome.avatarHint}</p>
             </div>
+          </div>
+
+          {/* Or pick a preset — always visible so a student without a
+              photo still gets a distinctive identity icon. */}
+          <div className="mb-6">
+            <span className="label-mono text-[10px] text-muted-foreground block mb-2">
+              {t.welcome.avatarPresetsLabel}
+            </span>
+            <AvatarPresetPicker
+              selected={avatarUrl}
+              onPick={(url) => setAvatarUrl(url)}
+              disabled={avatarBusy}
+            />
           </div>
 
           {/* Name */}

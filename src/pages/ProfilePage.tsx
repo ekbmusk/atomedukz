@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Avatar from "@/components/Avatar";
+import AvatarPresetPicker from "@/components/AvatarPresetPicker";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useLang } from "@/i18n/LanguageContext";
@@ -86,6 +87,20 @@ const ProfilePage = () => {
   const startEditIdentity = () => {
     setDraftName(profile?.full_name ?? "");
     setEditingIdentity(true);
+  };
+
+  const pickPreset = async (url: string) => {
+    if (!user) return;
+    setAvatarBusy(true);
+    try {
+      await updateProfile.mutateAsync({ userId: user.id, patch: { avatar_url: url } });
+      await refreshProfile();
+      toast.success(t.profile.saved);
+    } catch {
+      toast.error(t.profile.saveError);
+    } finally {
+      setAvatarBusy(false);
+    }
   };
   const saveIdentity = async () => {
     if (!user) return;
@@ -278,6 +293,22 @@ const ProfilePage = () => {
                   </div>
                 </div>
               </div>
+              {/* Preset avatar quick-picker — collapsed by default so
+                  the identity row stays compact. Useful for students
+                  who don't want to upload a personal photo. */}
+              <details className="mt-4 group">
+                <summary className="label-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer inline-flex items-center gap-1.5 list-none">
+                  <span className="group-open:rotate-90 transition-transform inline-block">›</span>
+                  {t.profile.avatarPresetsLabel}
+                </summary>
+                <div className="mt-3 max-w-md">
+                  <AvatarPresetPicker
+                    selected={profile?.avatar_url}
+                    onPick={pickPreset}
+                    disabled={avatarBusy || updateProfile.isPending}
+                  />
+                </div>
+              </details>
             </div>
           </div>
 
