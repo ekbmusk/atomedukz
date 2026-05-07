@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react";
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -33,8 +33,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
+  // Last user id we fetched role+profile for — avoids re-firing on every
+  // TOKEN_REFRESHED / INITIAL_SESSION event. Without this, an entry into the
+  // app would fire ~3-4 duplicate /profiles + /user_roles requests.
+  const fetchedUserIdRef = useRef<string | null>(null);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = async (userId: string, force = false) => {
+    if (!force && fetchedUserIdRef.current === userId) return;
+    fetchedUserIdRef.current = userId;
     const [{ data: roles }, { data: prof }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId),
       supabase.from("profiles").select("full_name, avatar_url, group_name").eq("user_id", userId).single(),
@@ -50,6 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         setTimeout(() => fetchUserData(session.user.id), 0);
       } else {
+        fetchedUserIdRef.current = null;
         setRole(null);
         setProfile(null);
       }
@@ -76,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (!user) return;
-    await fetchUserData(user.id);
+    await fetchUserData(user.id, true);
   };
 
   return (

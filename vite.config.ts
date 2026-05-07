@@ -20,7 +20,6 @@ export default defineConfig(({ mode }) => ({
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-query": ["@tanstack/react-query"],
           "vendor-supabase": ["@supabase/supabase-js"],
-          "vendor-charts": ["recharts"],
           "vendor-motion": ["framer-motion"],
           "vendor-radix": [
             "@radix-ui/react-dialog",

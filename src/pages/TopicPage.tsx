@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Check } from "lucide-react";
@@ -13,8 +13,11 @@ import LectureReader from "@/components/topic/LectureReader";
 import PhetSimulator from "@/components/topic/PhetSimulator";
 import ProblemsList from "@/components/topic/ProblemsList";
 import VideosList from "@/components/topic/VideosList";
-import LabSubmissionForm from "@/components/topic/LabSubmissionForm";
 import { BohrShells } from "@/components/atoms/AtomicGlyphs";
+
+// Lab tab pulls in KaTeX + react-markdown (~140 KB gzip). Defer until the
+// student actually opens the Lab tab so the first Lecture view stays light.
+const LabSubmissionForm = lazy(() => import("@/components/topic/LabSubmissionForm"));
 
 type TabKey = "lecture" | "phet" | "problems" | "lab" | "videos";
 
@@ -217,11 +220,19 @@ const TopicPage = () => {
 
               {tab === "lab" && (
                 lab ? (
-                  <LabSubmissionForm
-                    lab={lab}
-                    topicId={topic.id}
-                    defaultPhetSimId={sims[0]?.sim_id ?? null}
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="label-mono text-[11px] text-muted-foreground p-12 text-center">
+                        {t.topics.loading}
+                      </div>
+                    }
+                  >
+                    <LabSubmissionForm
+                      lab={lab}
+                      topicId={topic.id}
+                      defaultPhetSimId={sims[0]?.sim_id ?? null}
+                    />
+                  </Suspense>
                 ) : (
                   <div className="border border-border p-12 text-center">
                     <p className="label-mono text-[11px] text-muted-foreground">{t.lab.none}</p>
