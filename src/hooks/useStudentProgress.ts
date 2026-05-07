@@ -85,8 +85,8 @@ export function useStudentProgress(userId: string | undefined) {
     queryKey: ["student_progress", userId],
     enabled: Boolean(userId),
     queryFn: async (): Promise<StudentProgressBundle> => {
-      // Fetch in parallel: topics, problems-by-topic counts, attempts, lab submissions, labs, ai_hints count, quiz attempts
-      const [topicsRes, problemsCountRes, attemptsRes, labSubsRes, labsRes, hintsCountRes, quizzesRes] = await Promise.all([
+      // Fetch in parallel: topics, problems-by-topic counts, attempts, lab submissions, labs, ai_hints count
+      const [topicsRes, problemsCountRes, attemptsRes, labSubsRes, labsRes, hintsCountRes] = await Promise.all([
         supabase.from("topics" as never).select("id, week_number, title_kz").order("week_number"),
         supabase.from("problems" as never).select("topic_id"),
         supabase
@@ -104,10 +104,6 @@ export function useStudentProgress(userId: string | undefined) {
           .from("ai_hints" as never)
           .select("id", { count: "exact", head: true })
           .eq("user_id", userId!),
-        supabase
-          .from("quiz_attempts" as never)
-          .select("topic_id, level, score, completed_at")
-          .eq("user_id", userId!),
       ]);
 
       if (topicsRes.error) throw topicsRes.error;
@@ -117,19 +113,6 @@ export function useStudentProgress(userId: string | undefined) {
       if (labsRes.error) throw labsRes.error;
       // ai_hints count is non-fatal — if it fails we just show 0 hints
       const aiHintsTotal = hintsCountRes.error ? 0 : (hintsCountRes.count ?? 0);
-
-      // Best quiz score per (topic, level) → used for the
-      // topic_complete badge gate (replaces the old "all problems
-      // solved" rule which gamed itself on auto-grade).
-      type QuizRow = { topic_id: string; level: number; score: number; completed_at: string };
-      const quizRows = quizzesRes.error ? [] : ((quizzesRes.data ?? []) as QuizRow[]);
-      const bestQuizByTopic: Record<string, { score: number; earned_at: string }> = {};
-      for (const q of quizRows) {
-        const cur = bestQuizByTopic[q.topic_id];
-        if (!cur || q.score > cur.score) {
-          bestQuizByTopic[q.topic_id] = { score: q.score, earned_at: q.completed_at };
-        }
-      }
 
       const topics = (topicsRes.data ?? []) as Array<{ id: string; week_number: number; title_kz: string }>;
       const problemsCount = (problemsCountRes.data ?? []) as Array<{ topic_id: string }>;
@@ -314,13 +297,14 @@ export function useStudentProgress(userId: string | undefined) {
       const perfectLab = sortedLabs.find((l) => l.score != null && l.score >= 95);
       if (perfectLab) badges.push({ id: "perfect_lab", earned_at: perfectLab.submitted_at });
 
-      // topic_complete now requires passing *any* level's quiz with >= 70.
-      // The old rule (correct >= problems_total) gamed against the
-      // auto-grader, since a student could keep retrying the same easy
-      // task to flip is_correct without ever facing harder material.
-      const passedQuizTopic = Object.values(bestQuizByTopic).find((q) => q.score >= 70);
-      if (passedQuizTopic)
-        badges.push({ id: "topic_complete", earned_at: passedQuizTopic.earned_at });
+      const completedTopic = perTopic.find(
+        (p) => p.problems_total > 0 && p.attempts_correct >= p.problems_total,
+      );
+      if (completedTopic && correctOrdered.length > 0)
+        badges.push({
+          id: "topic_complete",
+          earned_at: correctOrdered[correctOrdered.length - 1].created_at,
+        });
 
       if (streak >= 3) badges.push({ id: "streak_3", earned_at: new Date().toISOString() });
       if (streak >= 7) badges.push({ id: "streak_7", earned_at: new Date().toISOString() });

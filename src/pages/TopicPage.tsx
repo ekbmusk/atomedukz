@@ -13,14 +13,13 @@ import LectureReader from "@/components/topic/LectureReader";
 import PhetSimulator from "@/components/topic/PhetSimulator";
 import ProblemsList from "@/components/topic/ProblemsList";
 import VideosList from "@/components/topic/VideosList";
-import QuizTab from "@/components/topic/QuizTab";
 import { BohrShells } from "@/components/atoms/AtomicGlyphs";
 
 // Lab tab pulls in KaTeX + react-markdown (~140 KB gzip). Defer until the
 // student actually opens the Lab tab so the first Lecture view stays light.
 const LabSubmissionForm = lazy(() => import("@/components/topic/LabSubmissionForm"));
 
-type TabKey = "lecture" | "phet" | "problems" | "quiz" | "lab" | "videos";
+type TabKey = "lecture" | "phet" | "problems" | "lab" | "videos";
 
 const TopicPage = () => {
   const { weekNumber: weekStr } = useParams<{ weekNumber: string }>();
@@ -75,7 +74,6 @@ const TopicPage = () => {
     { key: "lecture", label: t.topic.tabLecture, count: topic.slides_count },
     { key: "phet", label: t.topic.tabPhet, count: sims.length },
     { key: "problems", label: t.topic.tabProblems, count: problems.length },
-    { key: "quiz", label: t.topic.tabQuiz, count: 3 },
     { key: "lab", label: t.topic.tabLab, count: lab ? 1 : 0 },
     { key: "videos", label: t.topic.tabVideos, count: videos.length },
   ];
@@ -219,8 +217,6 @@ const TopicPage = () => {
               {tab === "phet" && <PhetSimulator sims={sims} />}
 
               {tab === "problems" && <ProblemsList problems={problems} topicId={topic.id} />}
-
-              {tab === "quiz" && <QuizTab topicId={topic.id} problems={problems} />}
 
               {tab === "lab" && (
                 lab ? (

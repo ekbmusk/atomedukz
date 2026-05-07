@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Check, Clock, AlertCircle, Loader2, Sparkles, Lock } from "lucide-react";
+import { ChevronDown, Check, Clock, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useLang } from "@/i18n/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import MathText from "@/components/MathText";
 import ProblemHint from "@/components/topic/ProblemHint";
 import { useAiExplain } from "@/hooks/useAiExplain";
-import { useTopicQuizzes } from "@/hooks/useQuiz";
 import type { Problem } from "@/hooks/useTopic";
 import {
   indexLatestByProblem,
@@ -16,8 +15,6 @@ import {
   useTopicAttempts,
   type ProblemAttempt,
 } from "@/hooks/useProblemAttempts";
-
-const QUIZ_PASS = 70;
 
 interface ProblemsListProps {
   problems: Problem[];
@@ -410,15 +407,11 @@ const LevelSection = ({
   problems,
   attemptsByProblem,
   topicId,
-  locked,
 }: {
   level: Level;
   problems: Problem[];
   attemptsByProblem: Record<string, ProblemAttempt>;
   topicId: string;
-  /** Soft-lock: section visible but problems can't be expanded until the
-   *  previous-level quiz is passed. Header shows lock + message. */
-  locked: boolean;
 }) => {
   const { t } = useLang();
   if (problems.length === 0) return null;
@@ -433,43 +426,21 @@ const LevelSection = ({
         </span>
         <span className="label-mono text-foreground">{t.problems[LEVEL_KEYS[level]]}</span>
         <div className="flex-1 h-px bg-border" />
-        {locked ? (
-          <span className="label-mono text-[10px] text-muted-foreground inline-flex items-center gap-1.5">
-            <Lock size={11} strokeWidth={1.6} />
-            {t.problems.levelLockedHint.replace(
-              "{prev}",
-              LEVEL_ROMAN[(level - 1) as Level],
-            )}
-          </span>
-        ) : (
-          <span className="label-mono text-[10px] text-muted-foreground tabular">
-            {solvedCount}/{problems.length}
-          </span>
-        )}
+        <span className="label-mono text-[10px] text-muted-foreground tabular">
+          {solvedCount}/{problems.length}
+        </span>
       </div>
-      {locked ? (
-        <div className="border border-dashed border-border bg-card/20 px-5 py-8 text-center">
-          <Lock size={16} strokeWidth={1.4} className="text-muted-foreground inline-block mb-2" />
-          <p className="label-mono text-[10px] text-muted-foreground">
-            {t.problems.levelLockedHint.replace(
-              "{prev}",
-              LEVEL_ROMAN[(level - 1) as Level],
-            )}
-          </p>
-        </div>
-      ) : (
-        <div>
-          {problems.map((p, i) => (
-            <ProblemRow
-              key={p.id}
-              problem={p}
-              index={i}
-              attempt={attemptsByProblem[p.id] ?? null}
-              topicId={topicId}
-            />
-          ))}
-        </div>
-      )}
+      <div>
+        {problems.map((p, i) => (
+          <ProblemRow
+            key={p.id}
+            problem={p}
+            index={i}
+            attempt={attemptsByProblem[p.id] ?? null}
+            topicId={topicId}
+          />
+        ))}
+      </div>
     </section>
   );
 };
@@ -478,7 +449,6 @@ const ProblemsList = ({ problems, topicId }: ProblemsListProps) => {
   const { t } = useLang();
   const { user } = useAuth();
   const { data: attempts } = useTopicAttempts(topicId, user?.id);
-  const { data: quizBest } = useTopicQuizzes(topicId, user?.id);
 
   const attemptsByProblem = useMemo(
     () => indexLatestByProblem(attempts ?? []),
@@ -498,16 +468,11 @@ const ProblemsList = ({ problems, topicId }: ProblemsListProps) => {
     if (p.difficulty in byLevel) byLevel[p.difficulty as Level].push(p);
   }
 
-  // Lock cascade: II locked until I quiz passed; III locked until II
-  // quiz passed. Level I is never locked.
-  const lvl1Pass = (quizBest?.[1] ?? 0) >= QUIZ_PASS;
-  const lvl2Pass = (quizBest?.[2] ?? 0) >= QUIZ_PASS;
-
   return (
     <div>
-      <LevelSection level={1} problems={byLevel[1]} attemptsByProblem={attemptsByProblem} topicId={topicId} locked={false} />
-      <LevelSection level={2} problems={byLevel[2]} attemptsByProblem={attemptsByProblem} topicId={topicId} locked={!lvl1Pass} />
-      <LevelSection level={3} problems={byLevel[3]} attemptsByProblem={attemptsByProblem} topicId={topicId} locked={!lvl2Pass} />
+      <LevelSection level={1} problems={byLevel[1]} attemptsByProblem={attemptsByProblem} topicId={topicId} />
+      <LevelSection level={2} problems={byLevel[2]} attemptsByProblem={attemptsByProblem} topicId={topicId} />
+      <LevelSection level={3} problems={byLevel[3]} attemptsByProblem={attemptsByProblem} topicId={topicId} />
     </div>
   );
 };
