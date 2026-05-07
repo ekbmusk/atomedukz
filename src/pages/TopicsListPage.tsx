@@ -7,20 +7,49 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTopics, useTopicCounts, type Topic } from "@/hooks/useTopics";
 import { useStudentProgress } from "@/hooks/useStudentProgress";
 import { Spectrum } from "@/components/atoms/AtomicGlyphs";
-import { ArrowUpRight, Check } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  Download,
+  FileText,
+  Sun,
+  Waves,
+  LineChart,
+  Layers3,
+  Grid3x3,
+  SlidersHorizontal,
+  Magnet,
+  Zap,
+  Radio,
+  Activity,
+  Sparkles,
+  Hexagon,
+  RotateCw,
+  AudioWaveform,
+  ScanLine,
+  Atom,
+} from "lucide-react";
 
-/* Two-letter symbol derived from the topic title — like an element symbol.
-   First letter of word 1 + first letter of word 2 (uppercased).            */
-function topicSymbol(title: string): string {
-  const words = title
-    .replace(/[.,/—–-]/g, " ")
-    .split(/\s+/)
-    .filter(Boolean);
-  if (words.length === 0) return "??";
-  const a = words[0]?.[0] ?? "";
-  const b = words[1]?.[0] ?? words[0]?.[1] ?? "";
-  return (a + b).toUpperCase();
-}
+/* One characteristic icon per syllabus week — replaces the old 2-letter
+   monogram. Falls back to <Atom/> for any unmapped week (defensive only;
+   the 15 syllabus weeks are all covered). */
+const TOPIC_ICONS: Record<number, typeof Atom> = {
+  1: Sun,                  // Жылулық сәулелену
+  2: Waves,                // Де Бройль гипотезасы (волны материи)
+  3: LineChart,            // Атом спектрі (Бальмер, Лайман, Пашен)
+  4: Layers3,              // Электрон қабаттары
+  5: Grid3x3,              // Периодтық жүйе
+  6: SlidersHorizontal,    // Аса нәзік құрылыс
+  7: Magnet,               // Магниттік қасиеттер
+  8: Zap,                  // Зееман / Рентген
+  9: Radio,                // ЭПР / магниттік резонанс
+  10: Activity,            // Спектр сызықтарының ені
+  11: Sparkles,            // Лазерлер
+  12: Hexagon,             // Молекуладағы қозғалыс
+  13: RotateCw,            // Молекуланың айналыс күйлері
+  14: AudioWaveform,       // Молекуланың тербеліс күйлері
+  15: ScanLine,            // Молекуланың электрондық спектрлері
+};
 
 /** Circular progress ring drawn around the topic's central glyph. */
 const ProgressRing = ({
@@ -115,12 +144,19 @@ const TopicCard = ({
           {topic.slides_count}<span className="text-muted-foreground/60">/sl</span>
         </div>
 
-        {/* Center: ring + 2-letter symbol */}
+        {/* Center: ring + topic icon */}
         <div className="absolute inset-0 flex items-center justify-center">
           <ProgressRing pct={pct} complete={isComplete}>
-            <span className="font-display tabular font-bold text-6xl md:text-7xl text-foreground/90 group-hover:text-primary transition-colors duration-300 tracking-[-0.05em]">
-              {topicSymbol(topic.title_kz)}
-            </span>
+            {(() => {
+              const Icon = TOPIC_ICONS[topic.week_number] ?? Atom;
+              return (
+                <Icon
+                  size={56}
+                  strokeWidth={1.4}
+                  className="text-foreground/85 group-hover:text-primary transition-colors duration-300"
+                />
+              );
+            })()}
           </ProgressRing>
         </div>
 
@@ -210,6 +246,38 @@ const TopicsListPage = () => {
           <div className="text-primary mb-10">
             <Spectrum height={28} className="w-full" />
           </div>
+
+          {/* Syllabus card — official course program, downloadable .docx */}
+          <a
+            href="/syllabus.docx"
+            download="Atom-quryly-syllabus.docx"
+            className="group relative grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 items-center border border-border bg-card/30 hover:border-primary hover:bg-card/50 transition-colors px-5 md:px-7 py-5 md:py-6 mb-10"
+          >
+            <div className="md:col-span-1 flex md:justify-center">
+              <FileText
+                size={28}
+                strokeWidth={1.4}
+                className="text-foreground/70 group-hover:text-primary transition-colors"
+              />
+            </div>
+            <div className="md:col-span-9 min-w-0">
+              <span className="label-mono text-[10px] text-muted-foreground">
+                {t.topics.syllabusEyebrow}
+              </span>
+              <h3 className="font-display text-base md:text-lg text-foreground mt-1 mb-2">
+                {t.topics.syllabusTitle}
+              </h3>
+              <p className="text-xs md:text-sm text-muted-foreground leading-relaxed font-light">
+                {t.topics.syllabusDescription}
+              </p>
+            </div>
+            <div className="md:col-span-2 flex md:justify-end">
+              <span className="inline-flex items-center gap-2 label-mono text-[11px] text-foreground border border-foreground/70 px-3 py-2 group-hover:bg-foreground group-hover:text-background transition-colors">
+                <Download size={12} strokeWidth={1.6} />
+                {t.topics.syllabusDownload}
+              </span>
+            </div>
+          </a>
 
           {/* Loading */}
           {isLoading && (
