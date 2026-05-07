@@ -67,9 +67,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // this redirect, the session looks like a normal login and the
       // auth flow would just drop the user on /topics with no chance to
       // pick a new password.
+      //
+      // Guard against false-positive fires: only redirect when the URL
+      // actually carries a type=recovery marker. Without this, certain
+      // SDK code paths can re-emit PASSWORD_RECOVERY on plain page loads
+      // and silently kick the user out of their session into the reset
+      // flow — which looks like "deploy logged me out".
       if (event === "PASSWORD_RECOVERY") {
-        if (window.location.pathname !== "/auth/reset") {
-          window.location.replace("/auth/reset");
+        const url = window.location.hash + window.location.search;
+        const looksLikeRecovery = /[?#&]type=recovery\b/i.test(url);
+        if (
+          looksLikeRecovery &&
+          window.location.pathname !== "/auth/reset" &&
+          window.location.pathname !== "/auth/callback"
+        ) {
+          window.location.replace("/auth/callback");
         }
       }
     });
