@@ -428,6 +428,15 @@ export const kz = {
     saved: "Сақталды",
     saveError: "Сақтау кезінде қате",
     avatarTooLarge: "Сурет өте үлкен (макс. 4 MB)",
+    notifications: {
+      title: "Хабарламалар",
+      newLabel: "жаңа",
+      empty: "Жаңа хабарлама жоқ",
+      problemGraded: "Сіздің есеп жауабыңыз бағаланды",
+      problemComment: "Мұғалім түсініктеме қалдырды",
+      labGraded: "Зертханалық жұмыс бағаланды",
+      disputeResolved: "Дау-дамай қаралды",
+    },
   },
   common: {
     underConstruction: "Бөлім жасалу үстінде",

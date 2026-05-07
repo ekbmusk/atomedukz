@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLang } from "@/i18n/LanguageContext";
 import { useTheme } from "@/hooks/useTheme";
 import NotificationsBell from "@/components/NotificationsBell";
+import StudentNotificationsBell from "@/components/StudentNotificationsBell";
 import Avatar from "@/components/Avatar";
 
 const Navbar = () => {
@@ -97,6 +98,12 @@ const Navbar = () => {
             {role === "teacher" && (
               <>
                 <NotificationsBell />
+                <span className="h-3 w-px bg-border" aria-hidden />
+              </>
+            )}
+            {role === "student" && user && (
+              <>
+                <StudentNotificationsBell />
                 <span className="h-3 w-px bg-border" aria-hidden />
               </>
             )}
