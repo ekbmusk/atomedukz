@@ -10,40 +10,65 @@ import { ArrowLeft, ArrowRight, Loader2, KeyRound } from "lucide-react";
 
 const CODE_LENGTH = 6;
 
+type Mode = "login" | "signup" | "verify";
+
 const AuthPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLang();
 
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [mode, setMode] = useState<Mode>("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Already authenticated? Skip the form. Recovery flows go through
-  // /auth/callback so we don't need to special-case them here.
   useEffect(() => {
-    if (user) navigate("/topics", { replace: true });
+    // Don't auto-redirect if the URL hash carries a recovery token —
+    // useAuth's PASSWORD_RECOVERY handler routes that to /auth/callback.
+    const isRecovery =
+      window.location.hash.includes("type=recovery") ||
+      window.location.search.includes("type=recovery");
+    if (user && !isRecovery) navigate("/topics", { replace: true });
   }, [user, navigate]);
 
-  const sendCode = async (e: React.FormEvent) => {
+  const login = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      toast.error(t.auth.enterEmail);
+    if (!email.trim() || !password) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      navigate("/topics", { replace: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || password.length < 6) {
+      if (password.length < 6) toast.error(t.auth.passwordTooShort);
       return;
     }
     setLoading(true);
     try {
+      // Send OTP to verify the email. shouldCreateUser=true seeds an
+      // unconfirmed auth.users row + the profiles trigger fires. After
+      // verifyOtp succeeds we'll set the password on the now-active
+      // session via updateUser.
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          // Always allow signup — same flow handles new and returning
-          // users. The trigger seeds an empty profile; /welcome catches
-          // the empty full_name and prompts for it.
           shouldCreateUser: true,
-          // Defensive: if Supabase falls back to a magic-link click
-          // instead of the 6-digit code, route it through our unified
-          // callback so the user lands on the right page.
+          data: { full_name: name.trim() },
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/welcome`,
         },
       });
@@ -52,13 +77,13 @@ const AuthPage = () => {
         return;
       }
       toast.success(t.auth.codeSent);
-      setStep("code");
+      setMode("verify");
     } finally {
       setLoading(false);
     }
   };
 
-  const verifyCode = async (e: React.FormEvent) => {
+  const verifyAndSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (code.length !== CODE_LENGTH) {
       toast.error(t.auth.codeIncomplete);
@@ -66,22 +91,47 @@ const AuthPage = () => {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { error: verifyErr } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: code.trim(),
         type: "email",
       });
-      if (error) {
-        toast.error(error.message);
+      if (verifyErr) {
+        toast.error(verifyErr.message);
         return;
       }
-      toast.success(t.auth.signedIn);
-      // Onboarding gate in ProtectedRoute will route fresh users to
-      // /welcome; established users go straight to /topics.
+      // The OTP succeeded → there is now an authenticated session for
+      // this email. Set the password the user typed at signup so future
+      // logins go through signInWithPassword (no code in the inbox each
+      // time).
+      const { error: pwErr } = await supabase.auth.updateUser({
+        password,
+        data: { full_name: name.trim() },
+      });
+      if (pwErr) {
+        // Verification went through but password set failed — user is
+        // still logged in via OTP. Tell them they can use "forgot
+        // password" later if needed; don't block the signup.
+        toast.warning(t.auth.passwordSetFailed);
+      } else {
+        toast.success(t.auth.signedUp);
+      }
       navigate("/topics", { replace: true });
     } finally {
       setLoading(false);
     }
+  };
+
+  const reset = async () => {
+    if (!email.trim()) {
+      toast.error(t.auth.enterEmail);
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    });
+    if (error) toast.error(error.message);
+    else toast.success(t.auth.resetSent);
   };
 
   const google = async () => {
@@ -93,8 +143,25 @@ const AuthPage = () => {
   };
 
   const onCodeChange = (raw: string) => {
-    // Numbers only; cap at CODE_LENGTH.
     setCode(raw.replace(/\D/g, "").slice(0, CODE_LENGTH));
+  };
+
+  const resendCode = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          shouldCreateUser: true,
+          data: { full_name: name.trim() },
+        },
+      });
+      if (error) toast.error(error.message);
+      else toast.success(t.auth.codeSent);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -123,43 +190,58 @@ const AuthPage = () => {
         </div>
 
         <h1 className="font-display text-4xl md:text-5xl tracking-[-0.03em] font-bold leading-[1.05]">
-          {step === "email" ? t.auth.otpTitle : t.auth.otpCodeTitle}
+          {mode === "login"
+            ? t.auth.loginTitle
+            : mode === "signup"
+              ? t.auth.signupTitle
+              : t.auth.otpCodeTitle}
         </h1>
-        <p className="mt-3 text-sm text-muted-foreground font-light">
-          {step === "email" ? t.auth.otpSubtitle : t.auth.otpCodeSubtitle.replace("{email}", email)}
-        </p>
+        {mode === "verify" && (
+          <p className="mt-3 text-sm text-muted-foreground font-light">
+            {t.auth.otpCodeSubtitle.replace("{email}", email)}
+          </p>
+        )}
 
-        {step === "email" && (
-          <form onSubmit={sendCode} className="mt-10 space-y-7">
-            <div className="space-y-2">
-              <label className="label-mono text-[10px] text-muted-foreground">{t.auth.email}</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t.auth.emailPlaceholder}
-                autoFocus
-                required
-                className="w-full bg-transparent border-b border-border focus:border-primary outline-none py-2 text-base font-light placeholder:text-muted-foreground/40 transition-colors"
-              />
-            </div>
+        {mode === "login" && (
+          <>
+            <form onSubmit={login} className="mt-10 space-y-7">
+              <Field label={t.auth.email}>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t.auth.emailPlaceholder}
+                  autoFocus
+                  required
+                  className={inputClass}
+                />
+              </Field>
+              <Field
+                label={t.auth.password}
+                aside={
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="label-mono text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {t.auth.forgotPassword}
+                  </button>
+                }
+              >
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t.auth.passwordPlaceholder}
+                  minLength={6}
+                  required
+                  className={inputClass}
+                />
+              </Field>
+              <SubmitButton loading={loading} label={t.auth.login} />
+            </form>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="group w-full bg-primary text-primary-foreground py-4 px-5 flex items-center justify-between hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <span className="font-display font-semibold">
-                {loading ? t.auth.loading : t.auth.sendCode}
-              </span>
-              {loading ? (
-                <Loader2 size={16} strokeWidth={1.6} className="animate-spin" />
-              ) : (
-                <ArrowRight size={16} strokeWidth={1.6} className="transition-transform group-hover:translate-x-1" />
-              )}
-            </button>
-
-            <div className="flex items-center gap-4">
+            <div className="mt-7 flex items-center gap-4">
               <div className="flex-1 h-px bg-border" />
               <span className="label-mono text-[10px] text-muted-foreground">{t.auth.or}</span>
               <div className="flex-1 h-px bg-border" />
@@ -168,21 +250,77 @@ const AuthPage = () => {
             <button
               type="button"
               onClick={google}
-              className="w-full border border-border hover:border-foreground py-3 px-5 flex items-center justify-center gap-3 label-mono text-[11px] text-foreground transition-colors"
+              className="mt-5 w-full border border-border hover:border-foreground py-3 px-5 flex items-center justify-center gap-3 label-mono text-[11px] text-foreground transition-colors"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.75c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.12A6.61 6.61 0 0 1 5.5 12c0-.74.13-1.46.34-2.12V7.04H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.96l3.66-2.84z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
-              </svg>
+              <GoogleIcon />
               {t.auth.googleLogin}
             </button>
-          </form>
+
+            <p className="mt-8 text-center label-mono text-[10px] text-muted-foreground">
+              {t.auth.noAccount}{" "}
+              <button
+                type="button"
+                onClick={() => setMode("signup")}
+                className="text-primary hover:underline"
+              >
+                {t.auth.signup}
+              </button>
+            </p>
+          </>
         )}
 
-        {step === "code" && (
-          <form onSubmit={verifyCode} className="mt-10 space-y-7">
+        {mode === "signup" && (
+          <>
+            <form onSubmit={startSignup} className="mt-10 space-y-7">
+              <Field label={t.auth.name}>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t.auth.namePlaceholder}
+                  autoFocus
+                  required
+                  className={inputClass}
+                />
+              </Field>
+              <Field label={t.auth.email}>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t.auth.emailPlaceholder}
+                  required
+                  className={inputClass}
+                />
+              </Field>
+              <Field label={t.auth.password} hint={t.auth.signupPasswordHint}>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t.auth.passwordPlaceholder}
+                  minLength={6}
+                  required
+                  className={inputClass}
+                />
+              </Field>
+              <SubmitButton loading={loading} label={t.auth.signupSendCode} />
+            </form>
+
+            <p className="mt-8 text-center label-mono text-[10px] text-muted-foreground">
+              {t.auth.hasAccount}{" "}
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="text-primary hover:underline"
+              >
+                {t.auth.login}
+              </button>
+            </p>
+          </>
+        )}
+
+        {mode === "verify" && (
+          <form onSubmit={verifyAndSetPassword} className="mt-10 space-y-7">
             <div className="space-y-2">
               <label className="label-mono text-[10px] text-muted-foreground inline-flex items-center gap-1.5">
                 <KeyRound size={11} strokeWidth={1.4} />
@@ -205,26 +343,17 @@ const AuthPage = () => {
               </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading || code.length !== CODE_LENGTH}
-              className="group w-full bg-primary text-primary-foreground py-4 px-5 flex items-center justify-between hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <span className="font-display font-semibold">
-                {loading ? t.auth.loading : t.auth.verifyCode}
-              </span>
-              {loading ? (
-                <Loader2 size={16} strokeWidth={1.6} className="animate-spin" />
-              ) : (
-                <ArrowRight size={16} strokeWidth={1.6} className="transition-transform group-hover:translate-x-1" />
-              )}
-            </button>
+            <SubmitButton
+              loading={loading}
+              label={t.auth.verifyAndCreate}
+              disabled={code.length !== CODE_LENGTH}
+            />
 
             <div className="flex items-center justify-between gap-4">
               <button
                 type="button"
                 onClick={() => {
-                  setStep("email");
+                  setMode("signup");
                   setCode("");
                 }}
                 className="label-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors"
@@ -233,10 +362,7 @@ const AuthPage = () => {
               </button>
               <button
                 type="button"
-                onClick={(e) => {
-                  setCode("");
-                  void sendCode(e as unknown as React.FormEvent);
-                }}
+                onClick={resendCode}
                 disabled={loading}
                 className="label-mono text-[10px] text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
               >
@@ -249,5 +375,67 @@ const AuthPage = () => {
     </div>
   );
 };
+
+const inputClass =
+  "w-full bg-transparent border-b border-border focus:border-primary outline-none py-2 text-base font-light placeholder:text-muted-foreground/40 transition-colors";
+
+const Field = ({
+  label,
+  hint,
+  aside,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <label className="label-mono text-[10px] text-muted-foreground">{label}</label>
+      {aside}
+    </div>
+    {children}
+    {hint && (
+      <p className="label-mono text-[10px] text-muted-foreground/70">{hint}</p>
+    )}
+  </div>
+);
+
+const SubmitButton = ({
+  loading,
+  label,
+  disabled,
+}: {
+  loading: boolean;
+  label: string;
+  disabled?: boolean;
+}) => (
+  <button
+    type="submit"
+    disabled={loading || disabled}
+    className="group w-full bg-primary text-primary-foreground py-4 px-5 flex items-center justify-between hover:bg-primary/90 transition-colors disabled:opacity-50"
+  >
+    <span className="font-display font-semibold">{loading ? "…" : label}</span>
+    {loading ? (
+      <Loader2 size={16} strokeWidth={1.6} className="animate-spin" />
+    ) : (
+      <ArrowRight
+        size={16}
+        strokeWidth={1.6}
+        className="transition-transform group-hover:translate-x-1"
+      />
+    )}
+  </button>
+);
+
+const GoogleIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z" />
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.75c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+    <path fill="#FBBC05" d="M5.84 14.12A6.61 6.61 0 0 1 5.5 12c0-.74.13-1.46.34-2.12V7.04H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.96l3.66-2.84z" />
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
+  </svg>
+);
 
 export default AuthPage;
