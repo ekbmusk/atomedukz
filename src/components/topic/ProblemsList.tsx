@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Check, Clock, AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { ChevronDown, Check, Clock, AlertCircle, Loader2, Sparkles, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useLang } from "@/i18n/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import MathText from "@/components/MathText";
 import ProblemHint from "@/components/topic/ProblemHint";
 import { useAiExplain } from "@/hooks/useAiExplain";
+import { useAiGradeAnswer, NoExpectedAnswerError } from "@/hooks/useAiGradeAnswer";
 import type { Problem } from "@/hooks/useTopic";
 import {
   indexLatestByProblem,
@@ -108,16 +109,19 @@ const ProblemRow = ({
 
   const disputeMutation = useDisputeAttempt();
   const explainMutation = useAiExplain();
+  const aiGradeMutation = useAiGradeAnswer();
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explanationCached, setExplanationCached] = useState(false);
   const [flash, setFlash] = useState<"correct" | "incorrect" | null>(null);
+  const [aiGradeNote, setAiGradeNote] = useState<string | null>(null);
 
-  // Reset the explanation when the latest attempt changes — a new wrong
+  // Reset transient state when the latest attempt changes — a new wrong
   // answer needs its own explanation, the previous one is no longer
   // about *this* attempt.
   useEffect(() => {
     setExplanation(null);
     setExplanationCached(false);
+    setAiGradeNote(null);
   }, [attempt?.id]);
 
   const requestExplanation = async () => {
@@ -131,6 +135,35 @@ const ProblemRow = ({
       setExplanationCached(res.cached);
     } catch {
       toast.error(t.problems.explainError);
+    }
+  };
+
+  /** Re-grade an existing strict-failed attempt through Groq. Updates
+   *  the attempt server-side if the AI says the answer is physically
+   *  equivalent to the expected one. */
+  const requestAiRecheck = async (attemptId: string): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const res = await aiGradeMutation.mutateAsync({
+        attemptId,
+        topicId,
+        userId: user.id,
+      });
+      if (res.is_correct) {
+        toast.success(t.problems.recheckCorrect);
+        setFlash("correct");
+        setTimeout(() => setFlash(null), 1100);
+      } else {
+        setAiGradeNote(res.note || t.problems.recheckIncorrect);
+      }
+      return res.is_correct;
+    } catch (err) {
+      if (err instanceof NoExpectedAnswerError) {
+        toast.message(t.problems.recheckNoAnswer);
+      } else {
+        toast.error(t.problems.recheckError);
+      }
+      return false;
     }
   };
 
@@ -154,16 +187,30 @@ const ProblemRow = ({
         if (res.is_correct) {
           toast.success(t.problems.autoCorrect);
           setFlash("correct");
+          setTimeout(() => setFlash(null), 1100);
+          setSolving(false);
+          setAnswer("");
         } else {
-          toast.error(t.problems.autoIncorrect);
-          setFlash("incorrect");
+          // Strict numeric/string match failed. Show pending toast and
+          // ask Groq whether the answer is physically equivalent
+          // (handles 1,5e-7 vs 1.5×10⁻⁷, нм vs nm, extra prose, etc).
+          // If AI flips it to correct, the attempt row is updated
+          // server-side and the next refetch picks it up.
+          toast.message(t.problems.aiRecheckRunning);
+          setSolving(false);
+          setAnswer("");
+          const flipped = await requestAiRecheck(res.attempt_id);
+          if (!flipped) {
+            toast.error(t.problems.autoIncorrect);
+            setFlash("incorrect");
+            setTimeout(() => setFlash(null), 1100);
+          }
         }
-        setTimeout(() => setFlash(null), 1100);
       } else {
         toast.success(t.problems.submitted);
+        setSolving(false);
+        setAnswer("");
       }
-      setSolving(false);
-      setAnswer("");
     } catch {
       toast.error(t.problems.saveError);
     }
@@ -280,7 +327,20 @@ const ProblemRow = ({
                           <span className="label-mono text-[10px] text-destructive">
                             {t.problems.autoIncorrectHint}
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => requestAiRecheck(attempt.id)}
+                              disabled={aiGradeMutation.isPending}
+                              className="inline-flex items-center gap-1.5 border border-foreground/40 text-foreground hover:bg-foreground hover:text-background label-mono text-[10px] px-3 py-1.5 transition-colors disabled:opacity-50"
+                            >
+                              {aiGradeMutation.isPending ? (
+                                <Loader2 size={11} strokeWidth={1.6} className="animate-spin" />
+                              ) : (
+                                <ShieldCheck size={11} strokeWidth={1.6} />
+                              )}
+                              {aiGradeMutation.isPending ? t.problems.recheckLoading : t.problems.recheckButton}
+                            </button>
                             <button
                               type="button"
                               onClick={requestExplanation}
@@ -307,6 +367,18 @@ const ProblemRow = ({
                             </button>
                           </div>
                         </div>
+
+                        {aiGradeNote && (
+                          <div className="bg-card/40 border border-border px-4 py-3">
+                            <div className="label-mono text-[10px] text-muted-foreground inline-flex items-center gap-1.5 mb-1.5">
+                              <ShieldCheck size={10} strokeWidth={1.6} />
+                              {t.problems.recheckLabel}
+                            </div>
+                            <p className="text-sm text-foreground/85 font-light leading-relaxed">
+                              {aiGradeNote}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Rendered AI explanation, if requested. KaTeX
                             via MathText for the formula bits. */}
