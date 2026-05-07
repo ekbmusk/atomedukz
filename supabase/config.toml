@@ -27,6 +27,31 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
 
+# Branded email templates (Kazakh, AtomEdu look & feel).
+# Subjects + HTML are versioned in supabase/templates/.
+# Locally `supabase start` picks these up. For prod copy the HTML into
+# Dashboard → Authentication → Email Templates, OR run
+# `supabase config push` (CLI ≥ 1.180) to sync the [auth.*] sections.
+[auth.email.template.confirmation]
+subject = "AtomEdu — email-ыңызды растаңыз"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "AtomEdu — құпиясөзді қалпына келтіру"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "AtomEdu — кіру сілтемесі"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "AtomEdu — жаңа email-ды растау"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.invite]
+subject = "AtomEdu курсына шақыру"
+content_path = "./supabase/templates/invite.html"
+
 [auth.external.google]
 enabled = false
 # Раскомментируйте и добавьте ваши credentials после создания OAuth приложения в Google Cloud Console
