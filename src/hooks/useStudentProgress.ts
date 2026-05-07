@@ -10,6 +10,10 @@ export interface TopicProgress {
   attempts_correct: number;
   lab_submitted: boolean;
   lab_score: number | null;
+  /** ISO timestamp of the latest attempt or lab submission for this
+   *  topic, or null if the student has never touched it. Used by the
+   *  per-topic detail table to show "last activity" column. */
+  last_activity_at: string | null;
 }
 
 export interface StudentTotals {
@@ -40,10 +44,21 @@ export interface BadgeId {
     | "perfect_lab"
     | "topic_complete"
     | "ai_curious"
+    | "ai_master"
     | "streak_3"
     | "streak_7";
   /** When the achievement was reached, ISO date. */
   earned_at: string;
+}
+
+/** Pointer to a topic the student is best/worst at. Both null when the
+ *  student has activity on fewer than two topics — in that case the
+ *  recommendation block doesn't render. */
+export interface TopicRecommendation {
+  topic_id: string;
+  week_number: number;
+  title_kz: string;
+  correct_pct: number;
 }
 
 export interface StudentProgressBundle {
@@ -54,6 +69,15 @@ export interface StudentProgressBundle {
    *  problem attempt or lab submission, ending today or yesterday. */
   streak_days: number;
   badges: BadgeId[];
+  /** Where the student is most/least successful by correct_pct. Both
+   *  null when there's not enough signal (< 2 active topics). */
+  recommendations: {
+    strongest: TopicRecommendation | null;
+    weakest: TopicRecommendation | null;
+  };
+  /** Count of AI hint requests by this user, used by the badge logic
+   *  and the AiQuotaCard widget. */
+  ai_hints_total: number;
 }
 
 export function useStudentProgress(userId: string | undefined) {
@@ -61,8 +85,8 @@ export function useStudentProgress(userId: string | undefined) {
     queryKey: ["student_progress", userId],
     enabled: Boolean(userId),
     queryFn: async (): Promise<StudentProgressBundle> => {
-      // Fetch in parallel: topics, problems-by-topic counts, attempts, lab submissions, labs
-      const [topicsRes, problemsCountRes, attemptsRes, labSubsRes, labsRes] = await Promise.all([
+      // Fetch in parallel: topics, problems-by-topic counts, attempts, lab submissions, labs, ai_hints count
+      const [topicsRes, problemsCountRes, attemptsRes, labSubsRes, labsRes, hintsCountRes] = await Promise.all([
         supabase.from("topics" as never).select("id, week_number, title_kz").order("week_number"),
         supabase.from("problems" as never).select("topic_id"),
         supabase
@@ -76,6 +100,10 @@ export function useStudentProgress(userId: string | undefined) {
           .eq("user_id", userId!)
           .order("submitted_at", { ascending: false }),
         supabase.from("labs" as never).select("id, topic_id, title_kz"),
+        supabase
+          .from("ai_hints" as never)
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId!),
       ]);
 
       if (topicsRes.error) throw topicsRes.error;
@@ -83,6 +111,8 @@ export function useStudentProgress(userId: string | undefined) {
       if (attemptsRes.error) throw attemptsRes.error;
       if (labSubsRes.error) throw labSubsRes.error;
       if (labsRes.error) throw labsRes.error;
+      // ai_hints count is non-fatal — if it fails we just show 0 hints
+      const aiHintsTotal = hintsCountRes.error ? 0 : (hintsCountRes.count ?? 0);
 
       const topics = (topicsRes.data ?? []) as Array<{ id: string; week_number: number; title_kz: string }>;
       const problemsCount = (problemsCountRes.data ?? []) as Array<{ topic_id: string }>;
@@ -136,6 +166,15 @@ export function useStudentProgress(userId: string | undefined) {
         }
       }
 
+      // Latest activity timestamp per topic (max of attempts + lab submissions)
+      const lastActivityByTopic: Record<string, string> = {};
+      const trackActivity = (topicId: string, iso: string) => {
+        const prev = lastActivityByTopic[topicId];
+        if (!prev || iso > prev) lastActivityByTopic[topicId] = iso;
+      };
+      for (const a of attempts) trackActivity(a.topic_id, a.created_at);
+      for (const ls of labSubs) trackActivity(ls.topic_id, ls.submitted_at);
+
       // Build perTopic rows (one per topic, even if no attempts)
       const perTopic: TopicProgress[] = topics.map((t) => {
         const a = attemptStatsByTopic[t.id] ?? { total: 0, correct: 0 };
@@ -149,6 +188,7 @@ export function useStudentProgress(userId: string | undefined) {
           attempts_correct: a.correct,
           lab_submitted: lab.submitted,
           lab_score: lab.score,
+          last_activity_at: lastActivityByTopic[t.id] ?? null,
         };
       });
 
@@ -269,7 +309,40 @@ export function useStudentProgress(userId: string | undefined) {
       if (streak >= 3) badges.push({ id: "streak_3", earned_at: new Date().toISOString() });
       if (streak >= 7) badges.push({ id: "streak_7", earned_at: new Date().toISOString() });
 
-      return { totals, perTopic, activity: events, streak_days: streak, badges };
+      // AI tutor engagement badges — earned_at is approximate (we don't
+      // fetch hint timestamps, just the count) so we use "now" as a stub.
+      if (aiHintsTotal >= 1)
+        badges.push({ id: "ai_curious", earned_at: new Date().toISOString() });
+      if (aiHintsTotal >= 25)
+        badges.push({ id: "ai_master", earned_at: new Date().toISOString() });
+
+      // Topic recommendations — pick the topic with highest and lowest
+      // correct_pct among topics where the student has attempted at least
+      // one problem. Only render when there are 2+ active topics, so we
+      // can show meaningfully different "strong" vs "weak" picks.
+      const ranked = perTopic
+        .filter((p) => p.attempts_total > 0 && p.problems_total > 0)
+        .map((p) => ({
+          topic_id: p.topic_id,
+          week_number: p.week_number,
+          title_kz: p.title_kz,
+          correct_pct: Math.round((p.attempts_correct / p.problems_total) * 100),
+        }))
+        .sort((a, b) => b.correct_pct - a.correct_pct);
+      const recommendations =
+        ranked.length >= 2
+          ? { strongest: ranked[0], weakest: ranked[ranked.length - 1] }
+          : { strongest: null, weakest: null };
+
+      return {
+        totals,
+        perTopic,
+        activity: events,
+        streak_days: streak,
+        badges,
+        recommendations,
+        ai_hints_total: aiHintsTotal,
+      };
     },
   });
 }

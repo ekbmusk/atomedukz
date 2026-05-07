@@ -7,13 +7,18 @@ import {
   Target,
   Award,
   Sparkles,
+  Brain,
 } from "lucide-react";
 import { useLang } from "@/i18n/LanguageContext";
+import AiQuotaCard from "@/components/profile/AiQuotaCard";
 import type { BadgeId } from "@/hooks/useStudentProgress";
 
 interface Props {
   streakDays: number;
   badges: BadgeId[];
+  /** Logged-in user id; we render the AI-quota card when present. The
+   *  card itself does the fetching. */
+  userId?: string;
 }
 
 const BADGE_ICONS: Record<BadgeId["id"], React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
@@ -24,6 +29,7 @@ const BADGE_ICONS: Record<BadgeId["id"], React.ComponentType<{ size?: number; st
   perfect_lab: Award,
   topic_complete: Sparkles,
   ai_curious: Sparkles,
+  ai_master: Brain,
   streak_3: Flame,
   streak_7: Flame,
 };
@@ -34,7 +40,7 @@ const BADGE_ICONS: Record<BadgeId["id"], React.ComponentType<{ size?: number; st
  * every fetch. Self-paced gamification: about your own milestones, not
  * peer comparison.
  */
-const StreakBadges = ({ streakDays, badges }: Props) => {
+const StreakBadges = ({ streakDays, badges, userId }: Props) => {
   const { t } = useLang();
   const tBadges = t.profile.badges;
 
@@ -45,7 +51,9 @@ const StreakBadges = ({ streakDays, badges }: Props) => {
         <div className="flex-1 h-px bg-border" />
       </div>
 
-      {/* Streak hero */}
+      {/* Top row: streak + AI quota share the heading band so the
+          three engagement signals (streak / AI usage / badges) live in
+          a single section without piling new section headers. */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-px bg-border">
         <div className="col-span-1 md:col-span-4 bg-background p-5 flex items-center gap-4">
           <Flame
@@ -63,14 +71,24 @@ const StreakBadges = ({ streakDays, badges }: Props) => {
           </div>
         </div>
 
+        {userId ? (
+          <div className="col-span-1 md:col-span-4">
+            <AiQuotaCard userId={userId} />
+          </div>
+        ) : null}
+
         {/* Badge cells — earned ones bright, locked ones muted */}
-        <div className="col-span-1 md:col-span-8 bg-background p-5">
+        <div
+          className={`col-span-1 bg-background p-5 ${
+            userId ? "md:col-span-4" : "md:col-span-8"
+          }`}
+        >
           {badges.length === 0 ? (
             <div className="label-mono text-[10px] text-muted-foreground text-center py-6">
               {tBadges.empty}
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
               {badges.map((b, i) => {
                 const Icon = BADGE_ICONS[b.id];
                 return (

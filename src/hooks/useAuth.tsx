@@ -9,7 +9,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   role: AppRole | null;
-  profile: { full_name: string; avatar_url: string; group_name: string } | null;
+  profile: { full_name: string; avatar_url: string } | null;
   signOut: () => Promise<void>;
   /** Re-fetches profile + role from Supabase. Call this after updating the
    *  profile (avatar, name, group) so the rest of the UI sees the change
@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchedUserIdRef.current = userId;
     const [{ data: roles }, { data: prof }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId),
-      supabase.from("profiles").select("full_name, avatar_url, group_name").eq("user_id", userId).single(),
+      supabase.from("profiles").select("full_name, avatar_url").eq("user_id", userId).single(),
     ]);
     if (roles && roles.length > 0) setRole(roles[0].role as AppRole);
     if (prof) setProfile(prof);
