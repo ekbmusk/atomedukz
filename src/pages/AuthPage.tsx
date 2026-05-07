@@ -20,7 +20,13 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) navigate("/topics");
+    // Don't auto-redirect while the URL hash carries a password-recovery
+    // token — useAuth's PASSWORD_RECOVERY handler will route to
+    // /auth/reset, and pre-empting it here would race that redirect.
+    const isRecovery =
+      window.location.hash.includes("type=recovery") ||
+      window.location.search.includes("type=recovery");
+    if (user && !isRecovery) navigate("/topics");
   }, [user, navigate]);
 
   const submit = async (e: React.FormEvent) => {
@@ -61,7 +67,9 @@ const AuthPage = () => {
       toast.error(t.auth.enterEmail);
       return;
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset`,
+    });
     if (error) toast.error(error.message);
     else toast.success(t.auth.resetSent);
   };

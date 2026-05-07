@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const AuthPage = lazy(() => import("./pages/AuthPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const WelcomePage = lazy(() => import("./pages/WelcomePage"));
 const TopicsListPage = lazy(() => import("./pages/TopicsListPage"));
 const TopicPage = lazy(() => import("./pages/TopicPage"));
@@ -39,6 +40,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/auth/reset" element={<ResetPasswordPage />} />
                   <Route
                     path="/welcome"
                     element={

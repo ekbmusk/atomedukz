@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -61,6 +61,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile(null);
       }
       setLoading(false);
+
+      // When the user lands here from a password-recovery email, Supabase
+      // attaches a recovery session and fires PASSWORD_RECOVERY. Without
+      // this redirect, the session looks like a normal login and the
+      // auth flow would just drop the user on /topics with no chance to
+      // pick a new password.
+      if (event === "PASSWORD_RECOVERY") {
+        if (window.location.pathname !== "/auth/reset") {
+          window.location.replace("/auth/reset");
+        }
+      }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
