@@ -35,7 +35,10 @@ const AuthPage = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name } },
+          options: {
+            data: { full_name: name },
+            emailRedirectTo: `${window.location.origin}/welcome`,
+          },
         });
         if (error) toast.error(error.message);
         else toast.success(t.auth.checkEmail);

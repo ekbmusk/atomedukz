@@ -45,7 +45,7 @@ const TeachersSection = () => {
 
             {/* Mock header */}
             <div className="flex items-center justify-between border-b border-border pb-3 mb-6">
-              <span className="label-mono text-[10px] text-foreground">PHYS-301 / Қ4</span>
+              <span className="label-mono text-[10px] text-foreground">PHYS-301</span>
               <span className="label-mono text-[10px] text-muted-foreground tabular">N=24</span>
             </div>
 
