@@ -46,3 +46,7 @@ enabled = false
 # isn't a security regression.
 [functions.ai-hint]
 verify_jwt = false
+
+# Auto-explain wrong answers — same JWT-in-handler approach as ai-hint.
+[functions.ai-explain]
+verify_jwt = false

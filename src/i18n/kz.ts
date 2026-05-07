@@ -191,6 +191,11 @@ export const kz = {
     hintExhausted: "Бүгінге арналған сұраулар бітті",
     hintError: "Көмек алу кезінде қате",
     hintMissingKey: "AI кілті орнатылмаған — кейінірек қайталап көріңіз",
+    askExplain: "AI түсіндірсін",
+    explainLoading: "Талдап жатыр…",
+    explainLabel: "AI ТҮСІНДІРМЕСІ",
+    explainCached: "сақталған",
+    explainError: "Түсіндірме алу кезінде қате",
   },
   lab: {
     sectionLabel: "ЗЕРТХАНАЛЫҚ ЖҰМЫС",

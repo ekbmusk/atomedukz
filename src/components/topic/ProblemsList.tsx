@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Check, Clock, AlertCircle, Loader2 } from "lucide-react";
+import { ChevronDown, Check, Clock, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useLang } from "@/i18n/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import MathText from "@/components/MathText";
 import ProblemHint from "@/components/topic/ProblemHint";
+import { useAiExplain } from "@/hooks/useAiExplain";
 import type { Problem } from "@/hooks/useTopic";
 import {
   indexLatestByProblem,
@@ -106,7 +107,32 @@ const ProblemRow = ({
   };
 
   const disputeMutation = useDisputeAttempt();
+  const explainMutation = useAiExplain();
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explanationCached, setExplanationCached] = useState(false);
   const [flash, setFlash] = useState<"correct" | "incorrect" | null>(null);
+
+  // Reset the explanation when the latest attempt changes — a new wrong
+  // answer needs its own explanation, the previous one is no longer
+  // about *this* attempt.
+  useEffect(() => {
+    setExplanation(null);
+    setExplanationCached(false);
+  }, [attempt?.id]);
+
+  const requestExplanation = async () => {
+    if (!attempt || !attempt.given_answer) return;
+    try {
+      const res = await explainMutation.mutateAsync({
+        problemId: problem.id,
+        givenAnswer: attempt.given_answer,
+      });
+      setExplanation(res.explanation);
+      setExplanationCached(res.cached);
+    } catch {
+      toast.error(t.problems.explainError);
+    }
+  };
 
   const submit = async () => {
     if (!user || !answer.trim()) return;
@@ -247,23 +273,61 @@ const ProblemRow = ({
                     <pre className="text-sm font-light whitespace-pre-wrap text-foreground/90 font-body">
                       {attempt.given_answer}
                     </pre>
-                    {/* Auto-grade outcome + dispute button */}
+                    {/* Auto-grade outcome + AI explain + dispute button */}
                     {attempt.is_correct === false && !attempt.disputed && (
-                      <div className="mt-3 flex items-center justify-between gap-3 pt-3 border-t border-border">
-                        <span className="label-mono text-[10px] text-destructive">
-                          {t.problems.autoIncorrectHint}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={dispute}
-                          disabled={disputeMutation.isPending}
-                          className="inline-flex items-center gap-1.5 border border-border hover:border-foreground label-mono text-[10px] px-3 py-1.5 transition-colors disabled:opacity-50"
-                        >
-                          {disputeMutation.isPending && (
-                            <Loader2 size={11} strokeWidth={1.6} className="animate-spin" />
-                          )}
-                          {t.problems.disputeAction}
-                        </button>
+                      <div className="mt-3 pt-3 border-t border-border space-y-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <span className="label-mono text-[10px] text-destructive">
+                            {t.problems.autoIncorrectHint}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={requestExplanation}
+                              disabled={explainMutation.isPending || Boolean(explanation)}
+                              className="inline-flex items-center gap-1.5 border border-primary/40 text-primary hover:bg-primary/5 label-mono text-[10px] px-3 py-1.5 transition-colors disabled:opacity-50"
+                            >
+                              {explainMutation.isPending ? (
+                                <Loader2 size={11} strokeWidth={1.6} className="animate-spin" />
+                              ) : (
+                                <Sparkles size={11} strokeWidth={1.6} />
+                              )}
+                              {explainMutation.isPending ? t.problems.explainLoading : t.problems.askExplain}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={dispute}
+                              disabled={disputeMutation.isPending}
+                              className="inline-flex items-center gap-1.5 border border-border hover:border-foreground label-mono text-[10px] px-3 py-1.5 transition-colors disabled:opacity-50"
+                            >
+                              {disputeMutation.isPending && (
+                                <Loader2 size={11} strokeWidth={1.6} className="animate-spin" />
+                              )}
+                              {t.problems.disputeAction}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Rendered AI explanation, if requested. KaTeX
+                            via MathText for the formula bits. */}
+                        {explanation && (
+                          <div className="bg-card/40 border border-primary/20 px-4 py-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="label-mono text-[10px] text-primary inline-flex items-center gap-1.5">
+                                <Sparkles size={10} strokeWidth={1.6} />
+                                {t.problems.explainLabel}
+                              </span>
+                              {explanationCached && (
+                                <span className="label-mono text-[9px] text-muted-foreground">
+                                  ({t.problems.explainCached})
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-foreground/85 font-light leading-relaxed">
+                              <MathText block>{explanation}</MathText>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     {attempt.disputed && (
