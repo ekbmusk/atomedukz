@@ -107,9 +107,18 @@ function parseLabMarkdown(md: string): ParsedDoc {
     const lead: string[] = [];
     let cur: { head: string; body: string[] } | null = null;
     const headRe = /^\s*\*\*([^*\n][^*\n]{1,120})\*\*[:\s]*$/;
+    // Bold lines that look like inline math (E = …, formula with backslashes,
+    // exponent symbols, etc) should NOT become section headings — they're
+    // just emphasized formulas inside the body of another section.
+    const looksLikeFormula = (s: string) =>
+      /[=\\^_$]|→|⇒|\d\s*[+\-*\/]\s*\d/.test(s);
     for (const ln of lines) {
       const m = ln.match(headRe);
-      if (m && /[а-яёәөүұқғңһіҗ]/i.test(m[1])) {
+      if (
+        m &&
+        /[а-яёәөүұқғңһіҗ]/i.test(m[1]) &&
+        !looksLikeFormula(m[1])
+      ) {
         if (cur) out.push(cur);
         cur = { head: m[1].trim().replace(/[.:\s]+$/, ""), body: [] };
       } else if (cur) {
@@ -154,7 +163,7 @@ function parseLabMarkdown(md: string): ParsedDoc {
   }
   intro = intro.replace(/\*+/g, "").trim();
 
-  const sections: Section[] = parts.map((part) => {
+  const rawSections: Section[] = parts.map((part) => {
     const eol = part.indexOf("\n");
     const headLine = (eol >= 0 ? part.slice(0, eol) : part).trim();
     const body = (eol >= 0 ? part.slice(eol + 1) : "").trim();
@@ -165,7 +174,71 @@ function parseLabMarkdown(md: string): ParsedDoc {
     };
   });
 
+  // Promote inline pipe-tables to their own TableSection so they render as
+  // interactive LabTable widgets even when they sit inside a procedure /
+  // questions / theory body. Topic 4's lab has two such tables embedded in
+  // procedure sections — without this, students saw read-only markdown.
+  const sections: Section[] = [];
+  for (const s of rawSections) {
+    // Don't reprocess sections that are already classified as tables —
+    // they're handled by TableSection directly.
+    if (s.kind === "table") {
+      sections.push(s);
+      continue;
+    }
+    const split = splitOutPipeTables(s.body);
+    if (split.length === 1) {
+      // No table found, keep section as-is.
+      sections.push(s);
+      continue;
+    }
+    // First chunk inherits the original section's title + kind. Subsequent
+    // chunks alternate between table and post-text generic chunks.
+    let firstSeen = false;
+    for (const chunk of split) {
+      if (chunk.kind === "table") {
+        sections.push({ kind: "table", title: s.title, body: chunk.text });
+      } else if (chunk.text.trim()) {
+        sections.push({
+          kind: firstSeen ? "generic" : s.kind,
+          title: firstSeen ? "" : s.title,
+          body: chunk.text,
+        });
+        firstSeen = true;
+      }
+    }
+  }
+
   return { title, subtitle, intro, sections };
+}
+
+/** Markdown pipe-table block: header row, separator (`|---|---|`), body
+ *  rows. Greedy on body rows. The opening `\|` ensures we match the
+ *  table proper, not e.g. a single `| something |` line of prose. */
+const PIPE_TABLE_RE = /(?:^|\n)((?:\|[^\n]*\|\s*\n)(?:\|[\s|:\-]+\|\s*\n)(?:\|[^\n]*\|\s*\n?)+)/g;
+
+/** Splits markdown body into alternating text / table chunks. Empty
+ *  chunks are still emitted — the caller filters them. */
+function splitOutPipeTables(body: string): Array<{ kind: "text" | "table"; text: string }> {
+  if (!body || !body.includes("|")) return [{ kind: "text", text: body }];
+  const out: Array<{ kind: "text" | "table"; text: string }> = [];
+  let lastEnd = 0;
+  // Reset regex state for safety (shared `g` flag).
+  PIPE_TABLE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = PIPE_TABLE_RE.exec(body)) != null) {
+    const tableStart = m.index + (m[0].startsWith("\n") ? 1 : 0);
+    const tableText = m[1];
+    const tableEnd = tableStart + tableText.length;
+    if (tableStart > lastEnd) {
+      out.push({ kind: "text", text: body.slice(lastEnd, tableStart) });
+    }
+    out.push({ kind: "table", text: tableText });
+    lastEnd = tableEnd;
+  }
+  if (lastEnd === 0) return [{ kind: "text", text: body }];
+  if (lastEnd < body.length) out.push({ kind: "text", text: body.slice(lastEnd) });
+  return out;
 }
 
 const LabContent = ({ markdown }: { markdown: string }) => {
