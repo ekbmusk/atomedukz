@@ -169,7 +169,11 @@ const AuthPage = () => {
         toast.success(t.auth.signedUp);
       }
       clearPending();
-      navigate("/topics", { replace: true });
+      // Always send fresh signups to /welcome for avatar pick + final
+      // confirmation. Without this, ProtectedRoute would let them slip
+      // straight to /topics because the trigger already wrote
+      // full_name from signup metadata.
+      navigate("/welcome", { replace: true });
     } finally {
       setLoading(false);
     }
