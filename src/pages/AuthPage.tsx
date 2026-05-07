@@ -43,7 +43,7 @@ const AuthPage = () => {
           password,
           options: {
             data: { full_name: name },
-            emailRedirectTo: `${window.location.origin}/welcome`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/welcome`,
           },
         });
         if (error) toast.error(error.message);
@@ -57,7 +57,7 @@ const AuthPage = () => {
   const google = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin + "/topics" },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/topics` },
     });
     if (error) toast.error(t.auth.googleError);
   };
@@ -68,7 +68,7 @@ const AuthPage = () => {
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset`,
+      redirectTo: `${window.location.origin}/auth/callback`,
     });
     if (error) toast.error(error.message);
     else toast.success(t.auth.resetSent);
