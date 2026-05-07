@@ -49,6 +49,17 @@ export interface PendingLabSubmission {
   lab_theory_kz: string | null;
   /** Teacher-set per-cell expected values for auto-grading. */
   lab_expected_results: Record<string, unknown> | null;
+  /** Cached AI grading suggestion: { score, rationale, table_score,
+   *  qualitative_score, model, created_at }. Null until the teacher
+   *  clicks "AI ұсыныс" or it's been generated previously. */
+  ai_suggestion: {
+    score: number;
+    qualitative_score?: number;
+    rationale?: string;
+    table_score?: { correct: number; total: number; percent: number } | null;
+    model?: string;
+    created_at?: string;
+  } | null;
   /** First PhET sim id for the topic, used as the inline-simulator default
    *  in the rendered lab body. */
   default_phet_sim_id: string | null;
@@ -184,7 +195,7 @@ export function usePendingLabSubmissions() {
       const { data: subs, error } = await supabase
         .from("lab_submissions" as never)
         .select(
-          "id, user_id, lab_id, topic_id, report_text, report_file_url, data, score, teacher_comment, reviewed_at, submitted_at",
+          "id, user_id, lab_id, topic_id, report_text, report_file_url, data, score, teacher_comment, reviewed_at, submitted_at, ai_suggestion",
         )
         .order("submitted_at", { ascending: true });
       if (error) throw error;
@@ -201,6 +212,7 @@ export function usePendingLabSubmissions() {
         teacher_comment: string | null;
         reviewed_at: string | null;
         submitted_at: string;
+        ai_suggestion: PendingLabSubmission["ai_suggestion"];
       }>;
 
       if (rows.length === 0) return [];
@@ -260,6 +272,7 @@ export function usePendingLabSubmissions() {
         teacher_comment: r.teacher_comment,
         reviewed_at: r.reviewed_at,
         submitted_at: r.submitted_at,
+        ai_suggestion: r.ai_suggestion ?? null,
         student_name: profiles[r.user_id]?.name ?? "—",
         student_group: profiles[r.user_id]?.group ?? null,
         lab_title: labsMap[r.lab_id]?.title ?? "",

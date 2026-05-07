@@ -50,3 +50,7 @@ verify_jwt = false
 # Auto-explain wrong answers — same JWT-in-handler approach as ai-hint.
 [functions.ai-explain]
 verify_jwt = false
+
+# AI lab grader (teacher-only). JWT verified in handler.
+[functions.ai-grade-lab]
+verify_jwt = false

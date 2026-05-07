@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, FileDown, Check, ChevronDown } from "lucide-react";
+import { Loader2, FileDown, Check, ChevronDown, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
 import { useLang } from "@/i18n/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useAiGradeLab } from "@/hooks/useAiGradeLab";
 import LabContent from "@/components/topic/LabContent";
 import { TopicPhetContext } from "@/components/topic/PhetInlineEmbed";
 import {
@@ -27,10 +28,39 @@ const LabReviewCard = ({ submission }: { submission: PendingLabSubmission }) => 
   const [comment, setComment] = useState(submission.teacher_comment ?? "");
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const reviewMutation = useReviewLab();
+  const aiGradeMutation = useAiGradeLab();
   const ref = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const [showLabBody, setShowLabBody] = useState(false);
+  // Local mirror of the cached suggestion so the just-fetched response
+  // shows up immediately without waiting for the pending-list refetch.
+  const [aiSuggestion, setAiSuggestion] = useState(submission.ai_suggestion ?? null);
+  useEffect(() => {
+    setAiSuggestion(submission.ai_suggestion ?? null);
+  }, [submission.ai_suggestion]);
+
+  const requestAiGrade = async (force = false) => {
+    try {
+      const res = await aiGradeMutation.mutateAsync({
+        submissionId: submission.id,
+        force,
+      });
+      setAiSuggestion({
+        score: res.score,
+        rationale: res.rationale,
+        table_score: res.table_score ?? null,
+      });
+    } catch {
+      toast.error(t.dashboard.aiGradeError);
+    }
+  };
+
+  const applyAiScore = () => {
+    if (aiSuggestion?.score == null) return;
+    setScore(String(aiSuggestion.score));
+    toast.success(t.dashboard.autoGradeApply);
+  };
 
   useEffect(() => {
     if (focusId === submission.id && ref.current) {
@@ -250,6 +280,74 @@ const LabReviewCard = ({ submission }: { submission: PendingLabSubmission }) => 
           </AnimatePresence>
         </div>
       )}
+
+      {/* AI grading suggestion — combines table-cell match + qualitative
+          analysis of the student's report text by Groq. Cached on the
+          submission row, so re-clicking is free unless "Қайта талдау"
+          is pressed. */}
+      <div className="px-5 py-4 border-b border-border bg-card/20">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="label-mono text-[10px] text-primary inline-flex items-center gap-1.5">
+            <Sparkles size={11} strokeWidth={1.6} />
+            {t.dashboard.aiGradeLabel}
+          </span>
+          {!aiSuggestion && (
+            <button
+              type="button"
+              onClick={() => requestAiGrade(false)}
+              disabled={aiGradeMutation.isPending}
+              className="inline-flex items-center gap-1.5 border border-primary/40 text-primary hover:bg-primary/5 label-mono text-[10px] px-3 py-1.5 transition-colors disabled:opacity-50"
+            >
+              {aiGradeMutation.isPending ? (
+                <Loader2 size={11} strokeWidth={1.6} className="animate-spin" />
+              ) : (
+                <Sparkles size={11} strokeWidth={1.6} />
+              )}
+              {aiGradeMutation.isPending ? t.dashboard.aiGradeLoading : t.dashboard.aiGradeButton}
+            </button>
+          )}
+          {aiSuggestion && (
+            <>
+              <span className="font-display tabular text-2xl text-primary leading-none">
+                {aiSuggestion.score}
+                <span className="text-muted-foreground/50 text-base">/100</span>
+              </span>
+              {aiSuggestion.table_score && (
+                <span className="label-mono text-[10px] text-muted-foreground tabular">
+                  {t.dashboard.aiGradeTableLabel}: {aiSuggestion.table_score.correct}/
+                  {aiSuggestion.table_score.total}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={applyAiScore}
+                className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 label-mono text-[10px] px-3 py-1.5 transition-colors"
+              >
+                <Check size={11} strokeWidth={1.8} />
+                {t.dashboard.aiGradeApply}
+              </button>
+              <button
+                type="button"
+                onClick={() => requestAiGrade(true)}
+                disabled={aiGradeMutation.isPending}
+                className="inline-flex items-center gap-1.5 border border-border hover:border-foreground label-mono text-[10px] px-3 py-1.5 transition-colors disabled:opacity-50"
+              >
+                {aiGradeMutation.isPending ? (
+                  <Loader2 size={11} strokeWidth={1.6} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={11} strokeWidth={1.6} />
+                )}
+                {t.dashboard.aiGradeRefresh}
+              </button>
+            </>
+          )}
+        </div>
+        {aiSuggestion?.rationale && (
+          <p className="mt-2 text-xs text-muted-foreground font-light leading-relaxed">
+            {aiSuggestion.rationale}
+          </p>
+        )}
+      </div>
 
       {/* Grade form */}
       <div className="px-5 py-4 space-y-3">
