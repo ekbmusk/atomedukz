@@ -1,39 +1,42 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ZoomIn, ZoomOut, Loader2, Check } from "lucide-react";
+import { X, ZoomIn, ZoomOut, Loader2, Check, RotateCw } from "lucide-react";
 
 interface Props {
   /** Image source. Either a File from a file input or an existing URL
    *  (e.g. when re-cropping a previously saved avatar). */
   source: File | string;
-  /** Final output edge length in CSS pixels. Default 256 — gives a
-   *  nice 256x256 PNG that scales fine to the 24px Navbar avatar and
-   *  the 80px profile avatar. */
+  /** Final output edge length in CSS pixels. Default 256. */
   size?: number;
   onSave: (blob: Blob) => Promise<void> | void;
   onCancel: () => void;
 }
 
-/**
- * Round avatar cropper. The user drags inside a 240px circle to pan
- * the image, uses a slider (or buttons) to zoom 1x..3x, and saves.
- * On save we render the visible region into a 256x256 canvas and
- * hand the parent a JPEG blob.
- *
- * Keeps it dependency-free so we don't drag a 30kb cropper library
- * just for this one screen.
- */
+const VIEW = 240; // round preview diameter in px
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 4;
+
 const AvatarCropper = ({ source, size = 256, onSave, onCancel }: Props) => {
-  const VIEW = 240; // on-screen circle diameter
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null);
-  // Pan + zoom in CSS-pixel space relative to the centre of the circle.
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  // Multiples of 90° applied AFTER drag/zoom. Stays small (0/90/180/270)
+  // so the canvas math is just an axis flip.
+  const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0);
   const [busy, setBusy] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const sliderRef = useRef<HTMLDivElement | null>(null);
 
-  // Build / tear down the object URL lifecycle.
+  // ESC to close.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
   useEffect(() => {
     if (typeof source === "string") {
       setImgUrl(source);
@@ -44,18 +47,17 @@ const AvatarCropper = ({ source, size = 256, onSave, onCancel }: Props) => {
     return () => URL.revokeObjectURL(url);
   }, [source]);
 
-  // Once the image element is loaded, choose an initial zoom so the
-  // smaller dimension fills the circle (cover-fit). Without this a tall
-  // portrait would start as a thin sliver in the middle.
+  // Cover-fit baseline so the image starts filling the circle on load.
   useEffect(() => {
     if (!imgEl) return;
     const compute = () => {
       const w = imgEl.naturalWidth;
       const h = imgEl.naturalHeight;
       if (!w || !h) return;
+      // After rotation 90/270 the image's effective short side flips,
+      // but we keep the cover-fit baseline static — the container is
+      // round, so it's fine, the user can re-zoom if they want.
       const baseScale = VIEW / Math.min(w, h);
-      // Track baseScale via transform: we keep `zoom` as a multiplier on
-      // top of cover-fit so 1x = exact fit, 2x = 2x zoomed in.
       imgEl.dataset.baseScale = String(baseScale);
     };
     if (imgEl.complete) compute();
@@ -63,6 +65,7 @@ const AvatarCropper = ({ source, size = 256, onSave, onCancel }: Props) => {
     return () => imgEl.removeEventListener("load", compute);
   }, [imgEl]);
 
+  // ── Drag (pan) ───────────────────────────────────────────────────────
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     dragRef.current = {
@@ -83,6 +86,24 @@ const AvatarCropper = ({ source, size = 256, onSave, onCancel }: Props) => {
     dragRef.current = null;
   };
 
+  // ── Custom slider (range input rendered inconsistently on Safari) ────
+  const updateZoomFromClientX = (clientX: number) => {
+    const el = sliderRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    setZoom(ZOOM_MIN + ratio * (ZOOM_MAX - ZOOM_MIN));
+  };
+  const onSliderPointerDown = (e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    updateZoomFromClientX(e.clientX);
+  };
+  const onSliderPointerMove = (e: React.PointerEvent) => {
+    if (!(e.buttons & 1)) return; // primary button down only
+    updateZoomFromClientX(e.clientX);
+  };
+
+  // ── Save: render to canvas with the same transform stack ─────────────
   const save = async () => {
     if (!imgEl) return;
     setBusy(true);
@@ -93,28 +114,26 @@ const AvatarCropper = ({ source, size = 256, onSave, onCancel }: Props) => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Clip to a circle so the saved PNG looks right against any background.
+      // Round clip so the saved JPEG composites well anywhere.
       ctx.beginPath();
       ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
       const baseScale = Number(imgEl.dataset.baseScale ?? 1);
-      // Effective scale = cover-fit × user zoom. Apply to natural dims.
-      const drawW = imgEl.naturalWidth * baseScale * zoom;
-      const drawH = imgEl.naturalHeight * baseScale * zoom;
-      // Map screen-space offset to canvas-space (size / VIEW ratio).
       const ratio = size / VIEW;
       const cx = size / 2 + offset.x * ratio;
       const cy = size / 2 + offset.y * ratio;
+      const drawW = imgEl.naturalWidth * baseScale * zoom * ratio;
+      const drawH = imgEl.naturalHeight * baseScale * zoom * ratio;
 
-      ctx.drawImage(
-        imgEl,
-        cx - (drawW * ratio) / 2,
-        cy - (drawH * ratio) / 2,
-        drawW * ratio,
-        drawH * ratio,
-      );
+      // Apply the user's rotation around the centre of the visible
+      // crop, then draw the image relative to that origin.
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.drawImage(imgEl, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.restore();
 
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob((b) => resolve(b), "image/jpeg", 0.9),
@@ -124,6 +143,8 @@ const AvatarCropper = ({ source, size = 256, onSave, onCancel }: Props) => {
       setBusy(false);
     }
   };
+
+  const zoomPct = ((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100;
 
   return (
     <AnimatePresence>
@@ -178,51 +199,93 @@ const AvatarCropper = ({ source, size = 256, onSave, onCancel }: Props) => {
                   position: "absolute",
                   left: "50%",
                   top: "50%",
-                  transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${
+                  transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) rotate(${rotation}deg) scale(${
                     imgEl ? Number(imgEl.dataset.baseScale ?? 1) * zoom : 1
                   })`,
                   transformOrigin: "center center",
                   pointerEvents: "none",
                   willChange: "transform",
+                  maxWidth: "none",
                 }}
               />
             )}
-            {/* Subtle ring to mark the visible boundary. */}
             <div
               className="absolute inset-0 rounded-full pointer-events-none"
-              style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.15)" }}
+              style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.18)" }}
             />
           </div>
 
           <p className="mt-3 label-mono text-[10px] text-muted-foreground/80 text-center">
-            Тінтуірмен сүйреп, ұсталыңыз. Үлкейту үшін слайдерді басыңыз.
+            Тінтуірмен/саусақпен сүйреп орналастырыңыз
           </p>
 
-          <div className="mt-4 flex items-center gap-3">
+          {/* Custom slider — input[type=range] rendered weirdly across
+              browsers (esp. Safari iOS). Plain divs + pointer events
+              are predictable. */}
+          <div className="mt-5 flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setZoom((z) => Math.max(ZOOM_MIN, +(z - 0.25).toFixed(2)))}
+              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
               aria-label="Zoom out"
             >
               <ZoomOut size={14} strokeWidth={1.6} />
             </button>
-            <input
-              type="range"
-              min={1}
-              max={3}
-              step={0.05}
-              value={zoom}
-              onChange={(e) => setZoom(Number(e.target.value))}
-              className="flex-1 accent-primary"
-            />
+            <div
+              ref={sliderRef}
+              role="slider"
+              aria-valuemin={ZOOM_MIN}
+              aria-valuemax={ZOOM_MAX}
+              aria-valuenow={zoom}
+              tabIndex={0}
+              onPointerDown={onSliderPointerDown}
+              onPointerMove={onSliderPointerMove}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") setZoom((z) => Math.max(ZOOM_MIN, +(z - 0.1).toFixed(2)));
+                if (e.key === "ArrowRight") setZoom((z) => Math.min(ZOOM_MAX, +(z + 0.1).toFixed(2)));
+              }}
+              className="relative flex-1 h-6 cursor-pointer touch-none"
+            >
+              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-border" />
+              <div
+                className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary"
+                style={{ width: `${zoomPct}%` }}
+              />
+              <div
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-primary border-2 border-background shadow"
+                style={{ left: `${zoomPct}%` }}
+              />
+            </div>
             <button
               type="button"
-              onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setZoom((z) => Math.min(ZOOM_MAX, +(z + 0.25).toFixed(2)))}
+              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
               aria-label="Zoom in"
             >
               <ZoomIn size={14} strokeWidth={1.6} />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setRotation((r) => (((r + 90) % 360) as 0 | 90 | 180 | 270))}
+              className="inline-flex items-center gap-1.5 border border-border hover:border-foreground label-mono text-[10px] px-3 py-1.5 transition-colors"
+              title="Бұру 90°"
+            >
+              <RotateCw size={11} strokeWidth={1.6} />
+              90°
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOffset({ x: 0, y: 0 });
+                setZoom(1);
+                setRotation(0);
+              }}
+              className="label-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Қалпына келтіру
             </button>
           </div>
 

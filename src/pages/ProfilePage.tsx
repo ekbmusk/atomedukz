@@ -5,7 +5,7 @@ import { LogOut, User, Loader2, Camera, Pencil, Sun, Moon, ArrowUpRight, ArrowDo
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import Avatar from "@/components/Avatar";
+import AvatarUploadButton from "@/components/AvatarUploadButton";
 import AvatarPresetPicker from "@/components/AvatarPresetPicker";
 import AvatarCropper from "@/components/AvatarCropper";
 import { useAuth } from "@/hooks/useAuth";
@@ -147,43 +147,27 @@ const ProfilePage = () => {
                 />
               )}
               <div className="flex items-center gap-4 md:gap-5 mb-4">
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={onPickAvatar}
-                    disabled={avatarBusy}
-                    className="relative group block"
-                    title={t.profile.changeAvatar}
-                  >
-                    <span className="hidden md:block">
-                      <Avatar
-                        url={profile?.avatar_url}
-                        name={profile?.full_name || user?.email}
-                        size={80}
-                      />
-                    </span>
-                    <span className="block md:hidden">
-                      <Avatar
-                        url={profile?.avatar_url}
-                        name={profile?.full_name || user?.email}
-                        size={56}
-                      />
-                    </span>
-                    <span className="absolute inset-0 flex items-center justify-center bg-background/70 opacity-0 group-active:opacity-100 group-hover:opacity-100 transition-opacity rounded-full">
-                      {avatarBusy ? (
-                        <Loader2 size={16} strokeWidth={1.4} className="animate-spin text-foreground" />
-                      ) : (
-                        <Camera size={14} strokeWidth={1.4} className="text-foreground" />
-                      )}
-                    </span>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp"
-                      onChange={onAvatarFileSelected}
-                      className="hidden"
+                <div className="shrink-0">
+                  <span className="hidden md:block">
+                    <AvatarUploadButton
+                      url={profile?.avatar_url}
+                      name={profile?.full_name || user?.email}
+                      size={80}
+                      busy={avatarBusy}
+                      onPickFile={(file) => setCropFile(file)}
+                      onTooLarge={() => toast.error(t.profile.avatarTooLarge)}
                     />
-                  </button>
+                  </span>
+                  <span className="block md:hidden">
+                    <AvatarUploadButton
+                      url={profile?.avatar_url}
+                      name={profile?.full_name || user?.email}
+                      size={56}
+                      busy={avatarBusy}
+                      onPickFile={(file) => setCropFile(file)}
+                      onTooLarge={() => toast.error(t.profile.avatarTooLarge)}
+                    />
+                  </span>
                 </div>
                 <div className="min-w-0 flex-1">
                   {editingIdentity ? (

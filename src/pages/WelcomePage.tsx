@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Camera, Loader2, ArrowRight, Sparkles } from "lucide-react";
+import { Loader2, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import Avatar from "@/components/Avatar";
+import AvatarUploadButton from "@/components/AvatarUploadButton";
 import AvatarPresetPicker from "@/components/AvatarPresetPicker";
 import AvatarCropper from "@/components/AvatarCropper";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,7 +33,6 @@ const WelcomePage = () => {
   // File the user just picked from the upload input — opens the
   // cropper modal until they confirm or cancel.
   const [cropFile, setCropFile] = useState<File | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   // If the user is already onboarded, skip ahead.
   useEffect(() => {
@@ -44,20 +43,6 @@ const WelcomePage = () => {
     setAvatarUrl(profile?.avatar_url ?? null);
     setName(profile?.full_name ?? "");
   }, [user?.id, profile?.full_name, profile?.avatar_url]);
-
-  const onPickAvatar = () => fileRef.current?.click();
-  const onAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error(t.profile.avatarTooLarge);
-      return;
-    }
-    // Hand off to the cropper. uploadAvatar happens only after the
-    // user picks a position and hits Save inside the modal.
-    setCropFile(file);
-  };
 
   const onCropSave = async (blob: Blob) => {
     if (!user) return;
@@ -133,28 +118,14 @@ const WelcomePage = () => {
 
           {/* Avatar picker */}
           <div className="flex items-center gap-5 mb-4">
-            <button
-              type="button"
-              onClick={onPickAvatar}
-              disabled={avatarBusy}
-              className="relative group shrink-0"
-            >
-              <Avatar url={avatarUrl} name={name || user?.email} size={72} />
-              <span className="absolute inset-0 flex items-center justify-center bg-background/70 opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                {avatarBusy ? (
-                  <Loader2 size={16} strokeWidth={1.4} className="animate-spin" />
-                ) : (
-                  <Camera size={16} strokeWidth={1.4} />
-                )}
-              </span>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png, image/jpeg, image/webp"
-                onChange={onAvatarChange}
-                className="hidden"
-              />
-            </button>
+            <AvatarUploadButton
+              url={avatarUrl}
+              name={name || user?.email}
+              size={72}
+              busy={avatarBusy}
+              onPickFile={(file) => setCropFile(file)}
+              onTooLarge={() => toast.error(t.profile.avatarTooLarge)}
+            />
             <div>
               <span className="label-mono text-[10px] text-muted-foreground block mb-1">
                 {t.welcome.avatarLabel}
