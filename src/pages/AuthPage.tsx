@@ -8,7 +8,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { Orbital } from "@/components/atoms/AtomicGlyphs";
 import { ArrowLeft, ArrowRight, Loader2, KeyRound } from "lucide-react";
 
-const CODE_LENGTH = 6;
+// Supabase email OTP length is project-configurable (6 by default, but
+// 8 is also common). Accept anything 6-10 digits and let verifyOtp
+// reject the wrong length on the server.
+const CODE_MIN = 6;
+const CODE_MAX = 10;
 
 type Mode = "login" | "signup" | "verify";
 
@@ -85,7 +89,7 @@ const AuthPage = () => {
 
   const verifyAndSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.length !== CODE_LENGTH) {
+    if (code.length < CODE_MIN) {
       toast.error(t.auth.codeIncomplete);
       return;
     }
@@ -143,7 +147,7 @@ const AuthPage = () => {
   };
 
   const onCodeChange = (raw: string) => {
-    setCode(raw.replace(/\D/g, "").slice(0, CODE_LENGTH));
+    setCode(raw.replace(/\D/g, "").slice(0, CODE_MAX));
   };
 
   const resendCode = async () => {
@@ -333,10 +337,10 @@ const AuthPage = () => {
                 autoComplete="one-time-code"
                 value={code}
                 onChange={(e) => onCodeChange(e.target.value)}
-                placeholder="000000"
+                placeholder="00000000"
                 autoFocus
-                maxLength={CODE_LENGTH}
-                className="w-full bg-transparent border-b border-border focus:border-primary outline-none py-2 font-display tabular text-3xl tracking-[0.4em] placeholder:text-muted-foreground/40 transition-colors"
+                maxLength={CODE_MAX}
+                className="w-full bg-transparent border-b border-border focus:border-primary outline-none py-2 font-display tabular text-3xl tracking-[0.3em] placeholder:text-muted-foreground/40 transition-colors"
               />
               <p className="label-mono text-[10px] text-muted-foreground/70">
                 {t.auth.codeHint}
@@ -346,7 +350,7 @@ const AuthPage = () => {
             <SubmitButton
               loading={loading}
               label={t.auth.verifyAndCreate}
-              disabled={code.length !== CODE_LENGTH}
+              disabled={code.length < CODE_MIN}
             />
 
             <div className="flex items-center justify-between gap-4">
