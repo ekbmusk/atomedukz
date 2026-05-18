@@ -92,8 +92,8 @@ export const kz = {
   },
   authors: {
     sectionLabel: "§ 04 — АВТОРЛАР",
-    title: "Курсты",
-    titleAccent: " жасағандар",
+    title: "Курс",
+    titleAccent: " авторлары",
     subtitle: "Атом және молекулалық физика курсының авторлары — байланыс үшін email-ге жазыңыздар.",
   },
   footer: {
