@@ -11,6 +11,7 @@ import {
 } from "@/hooks/useTeacherDashboard";
 import ProblemReviewCard from "@/components/teacher/ProblemReviewCard";
 import LabReviewCard from "@/components/teacher/LabReviewCard";
+import BulkAutoGradeButton from "@/components/teacher/BulkAutoGradeButton";
 import StudentsTable from "@/components/teacher/StudentsTable";
 import ContentTab from "@/components/teacher/ContentTab";
 import AnalyticsTab from "@/components/teacher/AnalyticsTab";
@@ -202,6 +203,9 @@ const TeacherDashboard = () => {
                         <span className="label-mono text-[10px] text-muted-foreground tabular">
                           N={visibleLabs.length}
                         </span>
+                      </div>
+                      <div className="flex justify-end">
+                        <BulkAutoGradeButton submissions={visibleLabs} />
                       </div>
                       <div className="space-y-3">
                         {visibleLabs.map((l) => (

@@ -344,6 +344,11 @@ export const kz = {
     aiGradeLabel: "AI ҰСЫНЫС",
     aiGradeTableLabel: "Кесте",
     aiGradeQualLabel: "Сапа",
+    bulkAutoGradeButton: "Авто-бағалау + барлығын қабылдау",
+    bulkAutoGradeConfirm:
+      "{n} зертханалық жұмысқа AI ұсынған балы автоматты түрде қойылады. Әр жұмысты жеке тексеру ұсынылады. Жалғастыру?",
+    bulkAutoGradeProgress: "Орындалуда: {done}/{total}",
+    bulkAutoGradeDone: "Дайын: {applied} қойылды, {failed} қате",
 
     editorPreview: "Қарау",
     editorEdit: "Өңдеу",
