@@ -77,8 +77,19 @@ const Footer = () => {
 
       {/* Bottom bar */}
       <div className="border-t border-border">
-        <div className="container py-5 flex items-center justify-between">
+        <div className="container py-5 flex flex-wrap items-center justify-between gap-y-3 gap-x-6">
           <span className="label-mono text-[10px]">{t.footer.rights}</span>
+          <span className="label-mono text-[10px] text-muted-foreground">
+            built by{" "}
+            <a
+              href="https://www.bekarys.me"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              bekarys.me
+            </a>
+          </span>
           <button
             onClick={scrollToTop}
             className="group flex items-center gap-2 label-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors"
