@@ -12,3 +12,11 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /auth/callback
+Disallow: /auth/reset
+Disallow: /welcome
+Disallow: /profile
+Disallow: /dashboard
+
+Host: https://www.atomedu.kz
+Sitemap: https://www.atomedu.kz/sitemap.xml
