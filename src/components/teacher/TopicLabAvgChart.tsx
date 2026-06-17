@@ -28,13 +28,13 @@ const TopicLabAvgChart = () => {
     <ChartShell title={t.dashboard.analyticsTitleLabAvg}>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-          <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} domain={[0, 100]} />
+          <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={13} />
+          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={13} domain={[0, 100]} />
           <Tooltip
             contentStyle={{
               background: "hsl(var(--background))",
               border: "1px solid hsl(var(--border))",
-              fontSize: 11,
+              fontSize: 14,
             }}
             cursor={{ fill: "hsl(var(--muted))" }}
             formatter={(v: number) => [v, t.dashboard.analyticsAxisScore]}

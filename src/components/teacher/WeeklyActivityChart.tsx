@@ -27,19 +27,19 @@ const WeeklyActivityChart = () => {
     <ChartShell title={t.dashboard.analyticsTitleWeekly}>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-          <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} allowDecimals={false} />
+          <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={13} />
+          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={13} allowDecimals={false} />
           <Tooltip
             contentStyle={{
               background: "hsl(var(--background))",
               border: "1px solid hsl(var(--border))",
-              fontSize: 11,
+              fontSize: 14,
             }}
             cursor={{ fill: "hsl(var(--muted))" }}
           />
           <Legend
             iconType="square"
-            wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}
+            wrapperStyle={{ fontSize: 14, color: "hsl(var(--muted-foreground))" }}
           />
           <Bar dataKey="problems" name={t.dashboard.analyticsLegendProblems} stackId="a" fill="hsl(var(--primary))" />
           <Bar dataKey="labs" name={t.dashboard.analyticsLegendLabs} stackId="a" fill="hsl(var(--foreground))" />
